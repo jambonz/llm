@@ -8,7 +8,7 @@ const awsSessionToken = process.env.AWS_SESSION_TOKEN;
 const bedrockApiKey = process.env.BEDROCK_API_KEY;
 const region = process.env.AWS_REGION ?? 'us-east-1';
 const model =
-  process.env.BEDROCK_TEST_MODEL ?? 'anthropic.claude-3-5-haiku-20241022-v1:0';
+  process.env.BEDROCK_TEST_MODEL ?? 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 
 const auth: AuthSpec | null = bedrockApiKey
   ? { kind: 'bedrockApiKey', apiKey: bedrockApiKey, region }

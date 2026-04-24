@@ -15,6 +15,17 @@ import type { AdapterManifest, ModelInfo } from '../../types.js';
  * broadly available across regions, and (unlike third-party Claude/Llama
  * models) not subject to provider-led "legacy" lifecycles that can revoke
  * access. Operators can override via `JAMBONZ_LLM_BEDROCK_PROBE_MODEL`.
+ *
+ * `deprecated: true` signals a model AWS may reject with
+ * `ResourceNotFoundException: "This Model is marked by provider as Legacy"`
+ * on accounts that haven't invoked it in the last 30 days. The id is kept in
+ * the manifest so accounts that *have* been using it can still select it;
+ * the webapp should badge/sort deprecated entries accordingly.
+ *
+ * Claude 4.x ids carry the `us.` cross-region inference profile prefix
+ * because on-demand invocation of plain `anthropic.claude-*-4-*` ids is no
+ * longer available in most regions — Bedrock requires the profile. Operators
+ * in EU/APAC should edit to `eu.`/`apac.` or enter a region-specific id.
  */
 const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
   {
@@ -51,6 +62,28 @@ const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
     },
   },
   {
+    id: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+    displayName: 'Claude Haiku 4.5 (on Bedrock)',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 200_000,
+    },
+  },
+  {
+    id: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+    displayName: 'Claude Sonnet 4.5 (on Bedrock)',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 200_000,
+    },
+  },
+  {
     id: 'anthropic.claude-3-5-haiku-20241022-v1:0',
     displayName: 'Claude 3.5 Haiku (on Bedrock)',
     capabilities: {
@@ -60,6 +93,7 @@ const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
       systemPrompt: true,
       maxContextTokens: 200_000,
     },
+    deprecated: true,
   },
   {
     id: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
@@ -71,6 +105,7 @@ const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
       systemPrompt: true,
       maxContextTokens: 200_000,
     },
+    deprecated: true,
   },
   {
     id: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
@@ -82,6 +117,7 @@ const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
       systemPrompt: true,
       maxContextTokens: 200_000,
     },
+    deprecated: true,
   },
   {
     id: 'anthropic.claude-3-7-sonnet-20250219-v1:0',
@@ -93,6 +129,7 @@ const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
       systemPrompt: true,
       maxContextTokens: 200_000,
     },
+    deprecated: true,
   },
   {
     id: 'meta.llama3-3-70b-instruct-v1:0',
