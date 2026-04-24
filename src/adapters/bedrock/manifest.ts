@@ -6,35 +6,41 @@ import type { AdapterManifest, ModelInfo } from '../../types.js';
  * suffix (e.g. `anthropic.claude-3-5-sonnet-20241022-v2:0`).
  *
  * Bedrock also supports cross-region inference profile ids (e.g.
- * `us.anthropic.claude-3-5-sonnet-...`) — users should enter those directly
- * when needed; the adapter passes `model` through unchanged.
+ * `us.anthropic.claude-3-5-sonnet-20241022-v2:0`) — users should enter those
+ * directly when needed; the adapter passes `model` through unchanged.
+ *
+ * Ordering matters: the first entry is used as the default probe model by
+ * api-server's GET /LlmCredentials/:sid/test when `supportsModelListing` is
+ * false. Claude 3 Haiku is first because it is the most universally-granted
+ * foundation model on Bedrock (historically on by default, low cost, small
+ * latency). Operators can override via `JAMBONZ_LLM_BEDROCK_PROBE_MODEL`.
  */
 const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
   {
-    id: 'anthropic.claude-opus-4-v1:0',
-    displayName: 'Claude Opus 4 (on Bedrock)',
+    id: 'anthropic.claude-3-haiku-20240307-v1:0',
+    displayName: 'Claude 3 Haiku (on Bedrock)',
     capabilities: {
       streaming: true,
       tools: true,
-      vision: true,
+      vision: false,
       systemPrompt: true,
       maxContextTokens: 200_000,
     },
   },
   {
-    id: 'anthropic.claude-sonnet-4-v1:0',
-    displayName: 'Claude Sonnet 4 (on Bedrock)',
+    id: 'anthropic.claude-3-5-haiku-20241022-v1:0',
+    displayName: 'Claude 3.5 Haiku (on Bedrock)',
     capabilities: {
       streaming: true,
       tools: true,
-      vision: true,
+      vision: false,
       systemPrompt: true,
       maxContextTokens: 200_000,
     },
   },
   {
-    id: 'anthropic.claude-3-7-sonnet-20250219-v1:0',
-    displayName: 'Claude 3.7 Sonnet (on Bedrock)',
+    id: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
+    displayName: 'Claude 3.5 Sonnet (on Bedrock)',
     capabilities: {
       streaming: true,
       tools: true,
@@ -55,14 +61,47 @@ const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
     },
   },
   {
-    id: 'anthropic.claude-3-5-haiku-20241022-v1:0',
-    displayName: 'Claude 3.5 Haiku (on Bedrock)',
+    id: 'anthropic.claude-3-7-sonnet-20250219-v1:0',
+    displayName: 'Claude 3.7 Sonnet (on Bedrock)',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 200_000,
+    },
+  },
+  {
+    id: 'amazon.nova-micro-v1:0',
+    displayName: 'Amazon Nova Micro',
     capabilities: {
       streaming: true,
       tools: true,
       vision: false,
       systemPrompt: true,
-      maxContextTokens: 200_000,
+      maxContextTokens: 128_000,
+    },
+  },
+  {
+    id: 'amazon.nova-lite-v1:0',
+    displayName: 'Amazon Nova Lite',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 300_000,
+    },
+  },
+  {
+    id: 'amazon.nova-pro-v1:0',
+    displayName: 'Amazon Nova Pro',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 300_000,
     },
   },
   {
@@ -79,39 +118,6 @@ const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
   {
     id: 'mistral.mistral-large-2407-v1:0',
     displayName: 'Mistral Large (on Bedrock)',
-    capabilities: {
-      streaming: true,
-      tools: true,
-      vision: false,
-      systemPrompt: true,
-      maxContextTokens: 128_000,
-    },
-  },
-  {
-    id: 'amazon.nova-pro-v1:0',
-    displayName: 'Amazon Nova Pro',
-    capabilities: {
-      streaming: true,
-      tools: true,
-      vision: true,
-      systemPrompt: true,
-      maxContextTokens: 300_000,
-    },
-  },
-  {
-    id: 'amazon.nova-lite-v1:0',
-    displayName: 'Amazon Nova Lite',
-    capabilities: {
-      streaming: true,
-      tools: true,
-      vision: true,
-      systemPrompt: true,
-      maxContextTokens: 300_000,
-    },
-  },
-  {
-    id: 'amazon.nova-micro-v1:0',
-    displayName: 'Amazon Nova Micro',
     capabilities: {
       streaming: true,
       tools: true,
