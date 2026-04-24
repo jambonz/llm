@@ -127,7 +127,11 @@ export function createOpenAIHarness(mocks: OpenAIMockSpies): ContractHarness {
 
 type Chunk = Record<string, unknown>;
 
-async function* makeMockStream(
+/**
+ * Exported so the Vertex-OpenAI harness can reuse the same OpenAI chunk shapes
+ * without duplicating scenario logic.
+ */
+export async function* makeMockStream(
   scenario: ContractScenario,
   signal?: AbortSignal,
 ): AsyncIterable<Chunk> {

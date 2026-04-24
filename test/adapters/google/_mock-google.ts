@@ -119,7 +119,11 @@ export function createGoogleHarness(mocks: GoogleMockSpies): ContractHarness {
 
 type Chunk = Record<string, unknown>;
 
-async function* makeMockStream(
+/**
+ * Exported so the Vertex-Gemini harness can reuse the same Gemini chunk shapes
+ * without duplicating scenario logic.
+ */
+export async function* makeMockStream(
   scenario: ContractScenario,
   signal?: AbortSignal,
 ): AsyncIterable<Chunk> {
