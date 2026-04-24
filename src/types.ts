@@ -108,6 +108,7 @@ export interface Usage {
 
 export type AuthSpec =
   | ApiKeyAuth
+  | AzureOpenAIApiKeyAuth
   | BedrockIamAuth
   | BedrockApiKeyAuth
   | GoogleApiKeyAuth
@@ -118,6 +119,30 @@ export interface ApiKeyAuth {
   kind: 'apiKey';
   apiKey: string;
   baseURL?: string;
+}
+
+/**
+ * Azure OpenAI Service uses an OpenAI-compatible wire protocol but differs
+ * from `api.openai.com` in three important ways:
+ *   1. Auth header is `api-key: {key}` (not `Authorization: Bearer {key}`).
+ *   2. The URL embeds the deployment name, not the model id:
+ *      `https://{endpoint}/openai/deployments/{deployment}/chat/completions?api-version={version}`.
+ *      The `model` field on the request is ignored by Azure; the deployment in
+ *      the URL determines which model runs. Capability flags in the manifest
+ *      are keyed by the underlying model (gpt-4o, gpt-4o-mini, ...).
+ *   3. `apiVersion` is a user-supplied knob — Microsoft rolls versions
+ *      frequently and customers shouldn't need a library release to move to a
+ *      newer one.
+ */
+export interface AzureOpenAIApiKeyAuth {
+  kind: 'azureOpenAIApiKey';
+  apiKey: string;
+  /** Resource endpoint, e.g. `https://my-resource.openai.azure.com`. No trailing slash. */
+  endpoint: string;
+  /** Deployment name the user created in Azure AI Studio / Azure OpenAI Studio. */
+  deployment: string;
+  /** Azure OpenAI data-plane api-version, e.g. `2024-10-21`. */
+  apiVersion: string;
 }
 
 export interface BedrockIamAuth {

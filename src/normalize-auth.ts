@@ -1,5 +1,6 @@
 import type {
   AuthSpec,
+  AzureOpenAIApiKeyAuth,
   BedrockApiKeyAuth,
   BedrockIamAuth,
   GoogleApiKeyAuth,
@@ -28,6 +29,12 @@ export interface RawCredential {
   api_url?: string | null;
   project_id?: string | null;
   location?: string | null;
+  /** Azure OpenAI resource endpoint, e.g. `https://my-resource.openai.azure.com`. */
+  endpoint?: string | null;
+  /** Azure OpenAI deployment name (the user-created deployment, not the model id). */
+  deployment?: string | null;
+  /** Azure OpenAI data-plane api-version, e.g. `2024-10-21`. */
+  api_version?: string | null;
 }
 
 /**
@@ -35,7 +42,7 @@ export interface RawCredential {
  *
  * Supported vendors: openai, deepseek, anthropic, google, vertex (alias for
  * vertex-gemini + vertex-openai — both accept the same auth shape), vertex-gemini,
- * vertex-openai, bedrock.
+ * vertex-openai, bedrock, azure-openai.
  *
  * Throws with a clear message if the raw credential is missing required fields.
  */
@@ -61,6 +68,9 @@ export function normalizeAuth(vendor: string, raw: RawCredential): AuthSpec {
 
     case 'bedrock':
       return normalizeBedrock(raw);
+
+    case 'azure-openai':
+      return normalizeAzureOpenAI(raw);
 
     default:
       throw new Error(
@@ -146,6 +156,28 @@ function normalizeBedrock(raw: RawCredential): BedrockIamAuth | BedrockApiKeyAut
   throw new Error(
     `normalizeAuth: vendor 'bedrock' requires either (access_key_id + secret_access_key) or api_key`,
   );
+}
+
+function normalizeAzureOpenAI(raw: RawCredential): AzureOpenAIApiKeyAuth {
+  if (!raw.api_key) {
+    throw new Error(`normalizeAuth: vendor 'azure-openai' requires 'api_key'`);
+  }
+  if (!raw.endpoint) {
+    throw new Error(`normalizeAuth: vendor 'azure-openai' requires 'endpoint'`);
+  }
+  if (!raw.deployment) {
+    throw new Error(`normalizeAuth: vendor 'azure-openai' requires 'deployment'`);
+  }
+  if (!raw.api_version) {
+    throw new Error(`normalizeAuth: vendor 'azure-openai' requires 'api_version'`);
+  }
+  return {
+    kind: 'azureOpenAIApiKey',
+    apiKey: raw.api_key,
+    endpoint: raw.endpoint,
+    deployment: raw.deployment,
+    apiVersion: raw.api_version,
+  };
 }
 
 function parseServiceKey(value: string | ServiceAccountJson): ServiceAccountJson {
