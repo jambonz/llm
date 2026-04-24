@@ -139,6 +139,70 @@ describe('VertexOpenAIAdapter — wire', () => {
     }
   });
 
+  it('non-2xx fetch response is rebuilt with body inlined as plain text', async () => {
+    const origFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(
+      async () =>
+        new Response(
+          '{"error":{"code":400,"message":"Request contains an invalid argument."}}',
+          {
+            status: 400,
+            statusText: 'Bad Request',
+            headers: { 'content-encoding': 'gzip', 'content-type': 'application/json' },
+          },
+        ),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    try {
+      await createLlm({
+        vendor: 'vertex-openai',
+        auth: {
+          kind: 'vertexServiceAccount',
+          credentials: SERVICE_KEY,
+          projectId: 'p',
+          location: 'us-central1',
+        },
+      });
+      const [opts] = mocks.openaiConstructorSpy.mock.calls[0]!;
+      const customFetch = opts.fetch as typeof fetch;
+      const rebuilt = await customFetch('https://example.com/path', { method: 'POST' });
+      // Body is readable (not locked by an earlier consumer).
+      expect(await rebuilt.text()).toContain('Request contains an invalid argument');
+      // content-encoding stripped so the SDK doesn't try to un-gzip plain text.
+      expect(rebuilt.headers.get('content-encoding')).toBeNull();
+      expect(rebuilt.status).toBe(400);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('empty 404 body gets an appended hint about regional model availability', async () => {
+    const origFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(
+      async () => new Response('', { status: 404, statusText: 'Not Found' }),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    try {
+      await createLlm({
+        vendor: 'vertex-openai',
+        auth: {
+          kind: 'vertexServiceAccount',
+          credentials: SERVICE_KEY,
+          projectId: 'p',
+          location: 'us-central1',
+        },
+      });
+      const [opts] = mocks.openaiConstructorSpy.mock.calls[0]!;
+      const customFetch = opts.fetch as typeof fetch;
+      const rebuilt = await customFetch('https://example.com/path', { method: 'POST' });
+      const body = await rebuilt.text();
+      expect(body).toContain('not hosted in this region');
+      expect(rebuilt.status).toBe(404);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
   it('rejects missing projectId', async () => {
     await expect(
       createLlm({

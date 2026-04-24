@@ -64,7 +64,11 @@ export class VertexOpenAIAdapter implements LlmAdapter<VertexServiceAccountAuth>
       const token = await googleClient.getAccessToken();
       const headers = new Headers(init?.headers);
       headers.set('Authorization', `Bearer ${token.token ?? ''}`);
-      return fetch(input, { ...init, headers });
+      const response = await fetch(input, { ...init, headers });
+      if (!response.ok) {
+        return surfaceErrorBody(response, input);
+      }
+      return response;
     };
 
     this.client = new OpenAI({
@@ -138,4 +142,55 @@ export class VertexOpenAIAdapter implements LlmAdapter<VertexServiceAccountAuth>
     }
     return this.client;
   }
+}
+
+/**
+ * On a non-2xx response, read the Vertex error body and reconstruct the
+ * Response so the OpenAI SDK can include the body in its thrown error.
+ *
+ * Why this is necessary: the OpenAI SDK v6 drops the body on some error
+ * responses (the ones delivered gzipped, which Vertex does) — callers see
+ * "404 status code (no body)" with no indication of root cause. Vertex's
+ * real body for the model-in-wrong-region case carries useful text naming
+ * the model and region. Reading the body here (before the SDK's parser gets
+ * it) lets us pass it through as plain text; the SDK then surfaces it
+ * verbatim in `err.message`.
+ */
+async function surfaceErrorBody(
+  response: Response,
+  input: Parameters<typeof fetch>[0],
+): Promise<Response> {
+  let body = '';
+  try {
+    body = await response.text();
+  } catch {
+    // Body already consumed or unreadable — fall through with empty body.
+  }
+
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  const hint =
+    response.status === 404 && !body
+      ? ' (no body returned — most commonly means the requested model is not hosted in this region; ' +
+        'check Google\'s partner-model availability matrix)'
+      : '';
+
+  // Log so operators see the full vendor text in api-server / feature-server
+  // logs regardless of how the thrown error is formatted downstream.
+  if (typeof console !== 'undefined' && console.warn) {
+    console.warn(
+      `[vertex-openai] ${response.status} ${response.statusText} from ${url}: ` +
+        `${body || '(empty body)'}${hint}`,
+    );
+  }
+
+  // Drop encoding headers so the SDK doesn't try to decompress plain text.
+  const headers = new Headers(response.headers);
+  headers.delete('content-encoding');
+  headers.delete('content-length');
+
+  return new Response(body + hint, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
