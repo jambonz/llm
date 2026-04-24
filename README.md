@@ -11,6 +11,10 @@ A voice-oriented LLM adapter library for Node.js.
 3. **Lossless history round-trip.** Vendor-native message shapes (Anthropic content blocks, OpenAI `tool_calls` arrays, Google `parts`, Bedrock `content[]`) are preserved via an opaque `vendorRaw` escape hatch.
 4. **Community-friendly contribution.** A new vendor is a single directory under `src/adapters/`, plus a line in `src/adapters/index.ts`.
 
+## Contributing
+
+New vendor adapters are the primary contribution path. See [docs/adding-a-vendor.md](docs/adding-a-vendor.md) for the step-by-step guide — copy the template, fill in the adapter, run the contract test-kit. A PR is merge-ready when all contract-kit checks pass against the new adapter and the build is green.
+
 ## Status
 
 Under active development. API may change before `1.0.0`.
