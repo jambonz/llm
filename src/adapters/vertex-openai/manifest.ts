@@ -81,11 +81,22 @@ export const vertexOpenAIManifest: AdapterManifest = {
           type: 'select',
           required: true,
           default: 'us-central1',
+          // Same region set as vertex-gemini plus us-east5 (where Google
+          // hosts Llama partner models). Partner-model availability varies
+          // per region; Google's docs for each model are the source of truth.
           options: [
             { value: 'us-central1', label: 'us-central1' },
+            { value: 'us-east1', label: 'us-east1' },
             { value: 'us-east4', label: 'us-east4' },
+            { value: 'us-east5', label: 'us-east5' },
+            { value: 'us-west1', label: 'us-west1' },
+            { value: 'us-west4', label: 'us-west4' },
             { value: 'europe-west1', label: 'europe-west1' },
+            { value: 'europe-west2', label: 'europe-west2' },
+            { value: 'europe-west3', label: 'europe-west3' },
             { value: 'europe-west4', label: 'europe-west4' },
+            { value: 'asia-east1', label: 'asia-east1' },
+            { value: 'asia-northeast1', label: 'asia-northeast1' },
             { value: 'asia-southeast1', label: 'asia-southeast1' },
           ],
         },
