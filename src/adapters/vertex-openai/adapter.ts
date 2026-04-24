@@ -46,8 +46,11 @@ export class VertexOpenAIAdapter implements LlmAdapter<VertexServiceAccountAuth>
       throw new Error('VertexOpenAIAdapter: location is required');
     }
 
+    // Vertex AI's OpenAI-compatible endpoint is at /v1beta1/ — documented in
+    // Google's SDK examples (google-cloud-aiplatform) and Google Cloud docs.
+    // A /v1/ variant returns 404; do not use.
     const baseURL =
-      `https://${auth.location}-aiplatform.googleapis.com/v1/projects/` +
+      `https://${auth.location}-aiplatform.googleapis.com/v1beta1/projects/` +
       `${auth.projectId}/locations/${auth.location}/endpoints/openapi`;
 
     const googleAuth = new GoogleAuth({

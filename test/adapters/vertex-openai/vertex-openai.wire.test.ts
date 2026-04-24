@@ -76,7 +76,7 @@ describe('VertexOpenAIAdapter — wire', () => {
     expect(mocks.openaiConstructorSpy).toHaveBeenCalledOnce();
     const [opts] = mocks.openaiConstructorSpy.mock.calls[0]!;
     expect(opts.baseURL).toBe(
-      'https://us-east4-aiplatform.googleapis.com/v1/projects/my-gcp-project/locations/us-east4/endpoints/openapi',
+      'https://us-east4-aiplatform.googleapis.com/v1beta1/projects/my-gcp-project/locations/us-east4/endpoints/openapi',
     );
     expect(opts.apiKey).toBe('vertex-ai');
     expect(typeof opts.fetch).toBe('function');
