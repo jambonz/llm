@@ -44,6 +44,28 @@ const deepseekManifest: AdapterManifest = {
   ],
   knownModels: [
     {
+      id: 'deepseek-v4-flash',
+      displayName: 'DeepSeek V4 Flash',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: false,
+        systemPrompt: true,
+        maxContextTokens: 1_000_000,
+      },
+    },
+    {
+      id: 'deepseek-v4-pro',
+      displayName: 'DeepSeek V4 Pro',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: false,
+        systemPrompt: true,
+        maxContextTokens: 1_000_000,
+      },
+    },
+    {
       id: 'deepseek-chat',
       displayName: 'DeepSeek Chat',
       capabilities: {
@@ -53,6 +75,7 @@ const deepseekManifest: AdapterManifest = {
         systemPrompt: true,
         maxContextTokens: 64_000,
       },
+      deprecated: true,
     },
     {
       id: 'deepseek-reasoner',
@@ -64,6 +87,7 @@ const deepseekManifest: AdapterManifest = {
         systemPrompt: true,
         maxContextTokens: 64_000,
       },
+      deprecated: true,
     },
   ],
   supportsModelListing: true,
