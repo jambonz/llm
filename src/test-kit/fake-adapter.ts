@@ -127,6 +127,10 @@ export class FakeAdapter implements LlmAdapter<ApiKeyAuth> {
     return fakeManifest.knownModels;
   }
 
+  async testCredential(): Promise<void> {
+    this.ensureInitialized();
+  }
+
   private ensureInitialized(): void {
     if (!this.initialized) {
       throw new Error('FakeAdapter: init() must be called before stream()/listAvailableModels()');

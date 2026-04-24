@@ -116,6 +116,20 @@ export class TemplateAdapter implements LlmAdapter<ApiKeyAuth> {
     throw new Error('TemplateAdapter.listAvailableModels: not implemented');
   }
 
+  async testCredential(): Promise<void> {
+    // Verify the credential authenticates against the vendor. This is an
+    // auth check only — success means "the vendor accepts these creds";
+    // it does NOT imply any specific model is accessible to the caller.
+    //
+    // Pick the cheapest authenticated call available:
+    //   - If the vendor has /models, call listAvailableModels() and drop the result.
+    //   - If there's no list endpoint, find a no-cost authenticated endpoint
+    //     (token mint, whoami, etc.).
+    //   - Avoid chat-probe fallbacks — they couple auth validation to specific
+    //     model grants, which is almost always wrong.
+    throw new Error('TemplateAdapter.testCredential: not implemented');
+  }
+
   // warmup?(): Promise<void> {
   //   // OPTIONAL: pre-establish TLS / pool a connection. No-op is fine.
   // }

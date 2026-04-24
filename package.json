@@ -1,6 +1,6 @@
 {
   "name": "@jambonz/llm",
-  "version": "0.2.7",
+  "version": "0.3.0",
   "description": "Voice-oriented LLM adapter library — a uniform interface for streaming chat completions from multiple LLM vendors, with first-class support for tool calls, AbortSignal interruption, and lossless history round-tripping.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -70,7 +70,6 @@
     }
   },
   "devDependencies": {
-    "@aws-sdk/client-bedrock": "^3.1036.0",
     "@eslint/js": "^9.17.0",
     "@types/node": "^22.10.0",
     "@vitest/coverage-v8": "^3.0.0",
@@ -85,6 +84,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.0",
+    "@aws-sdk/client-bedrock": "^3.1036.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1036.0",
     "@google/genai": "^1.50.1",
     "google-auth-library": "^10.6.2",

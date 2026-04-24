@@ -322,6 +322,29 @@ export interface LlmAdapter<A extends AuthSpec = AuthSpec> {
   listAvailableModels(): Promise<ModelInfo[]>;
 
   /**
+   * Verify the credential this adapter was initialized with. This is an auth
+   * check, not a capability check — success means "the vendor accepts these
+   * credentials"; it does not imply any specific model is accessible.
+   *
+   * Each adapter picks the cheapest authenticated call available:
+   *   - Vendors with a list-models endpoint call it and discard the result.
+   *   - Vendors without a list-models endpoint (Vertex-OpenAI, the OpenAI-
+   *     compatible MaaS layer) mint a bearer token or hit a zero-cost auth
+   *     endpoint.
+   *
+   * Resolves on success, throws on failure. Failure messages should surface
+   * the vendor's own error (401/403 for bad credentials, 404 for missing
+   * project, etc.) so operators can diagnose without guessing.
+   *
+   * Callers (e.g., api-server's POST/PUT credential routes) use this instead
+   * of streaming a probe prompt. Avoid reaching for a stream probe as a
+   * fallback: it requires a specific model grant, which is an accidental
+   * coupling between "is this credential valid" and "does this account have
+   * Mistral/Llama/etc. enabled".
+   */
+  testCredential(): Promise<void>;
+
+  /**
    * Optional: pre-establish connection to the vendor API. Useful for reducing
    * cold-start latency on the first prompt. No-op if not implemented.
    */

@@ -2,6 +2,10 @@ import {
   BedrockRuntimeClient,
   ConverseStreamCommand,
 } from '@aws-sdk/client-bedrock-runtime';
+import {
+  BedrockClient,
+  ListFoundationModelsCommand,
+} from '@aws-sdk/client-bedrock';
 import type {
   BedrockApiKeyAuth,
   BedrockIamAuth,
@@ -45,6 +49,7 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
   readonly acceptedAuth = ['bedrockApiKey', 'bedrockIam'] as const;
 
   private client: BedrockRuntimeClient | undefined;
+  private controlClientConfig: Record<string, unknown> | undefined;
 
   init(auth: BedrockAuthSpec, client?: ClientOptions): void {
     if (!auth.region) {
@@ -81,6 +86,10 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
     }
 
     this.client = new BedrockRuntimeClient(config);
+    // Stash the same config so testCredential can spin up a control-plane
+    // client on demand. `@aws-sdk/client-bedrock` accepts the same auth
+    // shape as the runtime client.
+    this.controlClientConfig = config;
   }
 
   async *stream(req: PromptRequest): AsyncIterable<LlmEvent> {
@@ -282,10 +291,27 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
   }
 
   async listAvailableModels(): Promise<ModelInfo[]> {
-    // The bedrock-runtime client has no /models endpoint; the control-plane
-    // @aws-sdk/client-bedrock package does but we don't pull it in. Return the
-    // curated manifest set.
+    // The bedrock-runtime client has no /models endpoint. We don't call the
+    // control-plane client here because listFoundationModels returns every
+    // model AWS offers, not models the account has access to — that distinction
+    // is what `ModelInfo.deprecated` surfaces in the manifest.
     return [...bedrockManifest.knownModels];
+  }
+
+  async testCredential(): Promise<void> {
+    // Use the control-plane client (`@aws-sdk/client-bedrock`) with the same
+    // credential config as the runtime client. `ListFoundationModels` is the
+    // cheapest authenticated GET and works regardless of which specific
+    // models the account has granted — an auth check, not an access check.
+    if (!this.controlClientConfig) {
+      throw new Error('BedrockAdapter: init() must be called before testCredential()');
+    }
+    const control = new BedrockClient(this.controlClientConfig);
+    try {
+      await control.send(new ListFoundationModelsCommand({}));
+    } finally {
+      control.destroy();
+    }
   }
 
   async warmup(): Promise<void> {

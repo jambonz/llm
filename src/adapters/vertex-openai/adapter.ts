@@ -29,6 +29,7 @@ export class VertexOpenAIAdapter implements LlmAdapter<VertexServiceAccountAuth>
   readonly acceptedAuth = ['vertexServiceAccount'] as const;
 
   private client: OpenAI | undefined;
+  private googleAuth: GoogleAuth | undefined;
 
   init(auth: VertexServiceAccountAuth, client?: ClientOptions): void {
     if (auth.kind !== 'vertexServiceAccount') {
@@ -53,13 +54,13 @@ export class VertexOpenAIAdapter implements LlmAdapter<VertexServiceAccountAuth>
       `https://${auth.location}-aiplatform.googleapis.com/v1beta1/projects/` +
       `${auth.projectId}/locations/${auth.location}/endpoints/openapi`;
 
-    const googleAuth = new GoogleAuth({
+    this.googleAuth = new GoogleAuth({
       credentials: auth.credentials as Record<string, unknown>,
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     });
 
     const authedFetch: typeof fetch = async (input, init) => {
-      const googleClient = await googleAuth.getClient();
+      const googleClient = await this.googleAuth!.getClient();
       const token = await googleClient.getAccessToken();
       const headers = new Headers(init?.headers);
       headers.set('Authorization', `Bearer ${token.token ?? ''}`);
@@ -100,6 +101,29 @@ export class VertexOpenAIAdapter implements LlmAdapter<VertexServiceAccountAuth>
     // The Vertex OpenAI-compatible endpoint does not expose a models list.
     // Return the curated set from the manifest.
     return [...vertexOpenAIManifest.knownModels];
+  }
+
+  async testCredential(): Promise<void> {
+    // The OpenAI-compat endpoint has no list-models or other zero-cost
+    // authenticated endpoint. Chat probes against a specific model are a
+    // bad proxy: they require that partner model (Mistral, Llama, …) to be
+    // granted in the caller's GCP project, which is independent of whether
+    // the service-account credentials themselves are valid.
+    //
+    // Minting a Google access token from the service-account is sufficient
+    // and vendor-appropriate: it verifies the credential JSON is well-formed,
+    // the service account exists, and the key is active. If the token mints
+    // but the caller hasn't enabled Vertex AI or a specific partner model in
+    // the project, the first stream() call will tell them — credential
+    // validity and model entitlement are properly separated concerns.
+    if (!this.googleAuth) {
+      throw new Error('VertexOpenAIAdapter: init() must be called before testCredential()');
+    }
+    const googleClient = await this.googleAuth.getClient();
+    const token = await googleClient.getAccessToken();
+    if (!token.token) {
+      throw new Error('VertexOpenAIAdapter: service account did not mint an access token');
+    }
   }
 
   async warmup(): Promise<void> {

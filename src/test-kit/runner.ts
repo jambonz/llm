@@ -293,6 +293,17 @@ export function runContractTests(harness: ContractHarness): void {
       }
     });
 
+    it('[15a] testCredential resolves on a valid auth probe', async () => {
+      // Same scenario as list-models: the mock simulates a successful
+      // authenticated vendor call. Adapters implement testCredential() either
+      // via listAvailableModels (when supported) or a vendor-specific cheap
+      // auth probe (Vertex-OpenAI token mint, etc.). Either way, the mocked
+      // "everything works" scenario should resolve without throwing.
+      await harness.mockScenario('list-models');
+      const adapter = await init(harness);
+      await expect(adapter.testCredential()).resolves.not.toThrow();
+    });
+
     if (harness.nonToolCapableModel) {
       it('[16] non-tool-capable model with tools declared either fails fast or runs without tool calls', async () => {
         await harness.mockScenario('simple-stream');

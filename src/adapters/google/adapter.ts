@@ -63,6 +63,11 @@ export class GoogleAdapter implements LlmAdapter<GoogleApiKeyAuth> {
     return listGeminiModels(this.ensureClient(), googleManifest.knownModels);
   }
 
+  async testCredential(): Promise<void> {
+    // Model listing authenticates; no stream needed.
+    await listGeminiModels(this.ensureClient(), googleManifest.knownModels);
+  }
+
   async warmup(): Promise<void> {
     // @google/genai has no cheap idempotent warmup endpoint. No-op.
   }

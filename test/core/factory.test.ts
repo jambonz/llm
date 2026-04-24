@@ -55,6 +55,7 @@ function buildMock(options: { vendor?: string; authKinds?: AuthKindForManifest[]
       appendAssistantToolCall: (history: Message[]) => history,
       appendToolResult: (history: Message[]) => history,
       listAvailableModels: async (): Promise<ModelInfo[]> => manifest.knownModels,
+      testCredential: async (): Promise<void> => undefined,
     }),
   };
 
@@ -133,6 +134,7 @@ describe('createLlm', () => {
         appendAssistantToolCall: (h: Message[]) => h,
         appendToolResult: (h: Message[]) => h,
         listAvailableModels: async () => [],
+        testCredential: async () => undefined,
       }),
     };
     registerAdapter(factory);

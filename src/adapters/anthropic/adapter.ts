@@ -273,6 +273,11 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
     return models;
   }
 
+  async testCredential(): Promise<void> {
+    // Anthropic's /v1/models is authenticated and costs nothing.
+    await this.ensureClient().models.list();
+  }
+
   async warmup(): Promise<void> {
     const client = this.ensureClient();
     await client.models.list().catch(() => undefined);

@@ -65,6 +65,12 @@ export class OpenAIAdapter implements LlmAdapter<ApiKeyAuth> {
     return listOpenAICompatibleModels(this.ensureClient(), openAIManifest.knownModels);
   }
 
+  async testCredential(): Promise<void> {
+    // /v1/models is the cheapest authenticated GET on the OpenAI API.
+    // Works for OpenAI proper and most compatible backends (DeepSeek included).
+    await this.ensureClient().models.list();
+  }
+
   async warmup(): Promise<void> {
     const client = this.ensureClient();
     await client.models.list().catch(() => undefined);

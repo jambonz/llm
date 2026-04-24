@@ -79,6 +79,11 @@ export class VertexGeminiAdapter implements LlmAdapter<VertexServiceAccountAuth>
     return listGeminiModels(this.ensureClient(), vertexGeminiManifest.knownModels);
   }
 
+  async testCredential(): Promise<void> {
+    // Listing models authenticates via the service-account bearer.
+    await listGeminiModels(this.ensureClient(), vertexGeminiManifest.knownModels);
+  }
+
   async warmup(): Promise<void> {
     // No cheap idempotent warmup endpoint. No-op.
   }
