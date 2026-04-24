@@ -72,6 +72,8 @@ export type {
 export { normalizeAuth } from './normalize-auth.js';
 export type { RawCredential } from './normalize-auth.js';
 
+export { assertValidRequest } from './validate.js';
+
 export {
   getAdapterFactory,
   getManifest,

@@ -7,6 +7,7 @@ import type {
   ModelInfo,
   PromptRequest,
 } from '../../types.js';
+import { assertValidRequest } from '../../validate.js';
 import { templateManifest } from './manifest.js';
 
 /**
@@ -37,7 +38,11 @@ export class TemplateAdapter implements LlmAdapter<ApiKeyAuth> {
   }
 
   // eslint-disable-next-line require-yield
-  async *stream(_req: PromptRequest): AsyncIterable<LlmEvent> {
+  async *stream(req: PromptRequest): AsyncIterable<LlmEvent> {
+    // Standard library-side validation. Rejects empty messages, role:'system'
+    // in messages, missing model. Contract check #18 depends on this.
+    assertValidRequest(req);
+
     // TODO: call the vendor's streaming endpoint, honor req.signal, and yield
     // events as they arrive. The contract is:
     //   - Zero or more `{type: 'token', text}` events for content deltas.
