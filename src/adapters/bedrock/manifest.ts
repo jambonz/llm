@@ -11,20 +11,43 @@ import type { AdapterManifest, ModelInfo } from '../../types.js';
  *
  * Ordering matters: the first entry is used as the default probe model by
  * api-server's GET /LlmCredentials/:sid/test when `supportsModelListing` is
- * false. Claude 3 Haiku is first because it is the most universally-granted
- * foundation model on Bedrock (historically on by default, low cost, small
- * latency). Operators can override via `JAMBONZ_LLM_BEDROCK_PROBE_MODEL`.
+ * false. Amazon Nova Micro is first — AWS's own cheapest-per-token model,
+ * broadly available across regions, and (unlike third-party Claude/Llama
+ * models) not subject to provider-led "legacy" lifecycles that can revoke
+ * access. Operators can override via `JAMBONZ_LLM_BEDROCK_PROBE_MODEL`.
  */
 const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
   {
-    id: 'anthropic.claude-3-haiku-20240307-v1:0',
-    displayName: 'Claude 3 Haiku (on Bedrock)',
+    id: 'amazon.nova-micro-v1:0',
+    displayName: 'Amazon Nova Micro',
     capabilities: {
       streaming: true,
       tools: true,
       vision: false,
       systemPrompt: true,
-      maxContextTokens: 200_000,
+      maxContextTokens: 128_000,
+    },
+  },
+  {
+    id: 'amazon.nova-lite-v1:0',
+    displayName: 'Amazon Nova Lite',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 300_000,
+    },
+  },
+  {
+    id: 'amazon.nova-pro-v1:0',
+    displayName: 'Amazon Nova Pro',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 300_000,
     },
   },
   {
@@ -69,39 +92,6 @@ const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
       vision: true,
       systemPrompt: true,
       maxContextTokens: 200_000,
-    },
-  },
-  {
-    id: 'amazon.nova-micro-v1:0',
-    displayName: 'Amazon Nova Micro',
-    capabilities: {
-      streaming: true,
-      tools: true,
-      vision: false,
-      systemPrompt: true,
-      maxContextTokens: 128_000,
-    },
-  },
-  {
-    id: 'amazon.nova-lite-v1:0',
-    displayName: 'Amazon Nova Lite',
-    capabilities: {
-      streaming: true,
-      tools: true,
-      vision: true,
-      systemPrompt: true,
-      maxContextTokens: 300_000,
-    },
-  },
-  {
-    id: 'amazon.nova-pro-v1:0',
-    displayName: 'Amazon Nova Pro',
-    capabilities: {
-      streaming: true,
-      tools: true,
-      vision: true,
-      systemPrompt: true,
-      maxContextTokens: 300_000,
     },
   },
   {
