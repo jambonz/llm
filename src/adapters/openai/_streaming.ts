@@ -21,6 +21,22 @@ export async function* streamFromOpenAI(
   req: PromptRequest,
   options: {
     knownModels: ReadonlyArray<ModelInfo>;
+    /**
+     * Whether to set `stream_options: { include_usage: true }` on the
+     * request. Defaults to `true` for OpenAI's native API. Set to `false`
+     * for third-party OpenAI-compatible endpoints (e.g. Vertex AI's OpenAI
+     * endpoint for partner models) that reject unknown extensions with a
+     * 400 error. When disabled, the `end` event's `usage` field is omitted.
+     */
+    includeStreamOptions?: boolean;
+    /**
+     * If the caller did not supply `maxTokens`, use this value. Set by the
+     * Vertex-OpenAI adapter because Vertex AI's Llama MaaS endpoint returns
+     * an empty assistant message (zero tokens, `finish_reason: stop`) when
+     * `max_tokens` is omitted. Leave undefined for OpenAI's native API,
+     * which defaults correctly on its own.
+     */
+    defaultMaxTokens?: number;
   },
 ): AsyncIterable<LlmEvent> {
   assertValidRequest(req);
@@ -40,14 +56,17 @@ export async function* streamFromOpenAI(
     model: req.model,
     messages: messages as ChatCompletionCreateParamsStreaming['messages'],
     stream: true,
-    stream_options: { include_usage: true },
+    ...(options.includeStreamOptions !== false
+      ? { stream_options: { include_usage: true } }
+      : {}),
   };
   if (tools) {
     body.tools = tools as unknown as ChatCompletionCreateParamsStreaming['tools'];
     body.tool_choice = 'auto';
   }
   if (req.temperature !== undefined) body.temperature = req.temperature;
-  if (req.maxTokens !== undefined) body.max_tokens = req.maxTokens;
+  const effectiveMaxTokens = req.maxTokens ?? options.defaultMaxTokens;
+  if (effectiveMaxTokens !== undefined) body.max_tokens = effectiveMaxTokens;
 
   let stream;
   try {

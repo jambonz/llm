@@ -76,8 +76,12 @@ export class VertexOpenAIAdapter implements LlmAdapter<VertexServiceAccountAuth>
   }
 
   stream(req: PromptRequest): AsyncIterable<LlmEvent> {
+    // Vertex AI's Llama MaaS endpoint returns an empty assistant message
+    // (zero tokens, finish_reason: stop) when max_tokens is not set. Apply
+    // a sensible default so callers don't have to know this quirk.
     return streamFromOpenAI(this.ensureClient(), req, {
       knownModels: vertexOpenAIManifest.knownModels,
+      defaultMaxTokens: 4096,
     });
   }
 

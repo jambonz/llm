@@ -41,7 +41,21 @@ import {
   registerAdapter,
 } from '../../../src/registry.js';
 import { vertexOpenAIFactory } from '../../../src/adapters/vertex-openai/index.js';
-import type { ServiceAccountJson } from '../../../src/types.js';
+import type { LlmAdapter, LlmEvent, PromptRequest, ServiceAccountJson } from '../../../src/types.js';
+
+function mockStream(chunks: Array<Record<string, unknown>>): AsyncIterable<Record<string, unknown>> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for (const c of chunks) yield c;
+    },
+  };
+}
+
+async function drain(adapter: LlmAdapter, req: PromptRequest): Promise<LlmEvent[]> {
+  const events: LlmEvent[] = [];
+  for await (const e of adapter.stream(req)) events.push(e);
+  return events;
+}
 
 const SERVICE_KEY: ServiceAccountJson = {
   type: 'service_account',
@@ -151,6 +165,49 @@ describe('VertexOpenAIAdapter — wire', () => {
         },
       }),
     ).rejects.toThrowError(/location is required/);
+  });
+
+  it('defaults max_tokens to 4096 when caller omits maxTokens (Vertex Llama MaaS quirk)', async () => {
+    mocks.create.mockResolvedValue(
+      mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
+    );
+    const adapter = await createLlm({
+      vendor: 'vertex-openai',
+      auth: {
+        kind: 'vertexServiceAccount',
+        credentials: SERVICE_KEY,
+        projectId: 'p',
+        location: 'us-central1',
+      },
+    });
+    await drain(adapter, {
+      model: 'meta/llama-4-scout-17b-16e-instruct-maas',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    const [body] = mocks.create.mock.calls[0]!;
+    expect(body.max_tokens).toBe(4096);
+  });
+
+  it('respects caller-provided maxTokens over the Vertex default', async () => {
+    mocks.create.mockResolvedValue(
+      mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
+    );
+    const adapter = await createLlm({
+      vendor: 'vertex-openai',
+      auth: {
+        kind: 'vertexServiceAccount',
+        credentials: SERVICE_KEY,
+        projectId: 'p',
+        location: 'us-central1',
+      },
+    });
+    await drain(adapter, {
+      model: 'meta/llama-4-scout-17b-16e-instruct-maas',
+      messages: [{ role: 'user', content: 'hi' }],
+      maxTokens: 256,
+    });
+    const [body] = mocks.create.mock.calls[0]!;
+    expect(body.max_tokens).toBe(256);
   });
 
   it('listAvailableModels returns the curated manifest set without calling the SDK', async () => {
