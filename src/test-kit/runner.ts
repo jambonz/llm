@@ -259,12 +259,11 @@ export function runContractTests(harness: ContractHarness): void {
         (e): e is Extract<LlmEvent, { type: 'toolCall' }> => e.type === 'toolCall',
       );
       expect(tc).toBeDefined();
-      const history: Message[] = [
-        { role: 'user', content: 'call it' },
-        harness.buildAssistantWithToolCall(tc!),
-      ];
-      const withResult = adapter.appendToolResult(history, tc!.id, { ok: true });
-      expect(withResult.length).toBe(history.length + 1);
+      const baseHistory: Message[] = [{ role: 'user', content: 'call it' }];
+      const afterAssistant = adapter.appendAssistantToolCall(baseHistory, [tc!]);
+      expect(afterAssistant.length).toBe(baseHistory.length + 1);
+      const withResult = adapter.appendToolResult(afterAssistant, tc!.id, { ok: true });
+      expect(withResult.length).toBe(afterAssistant.length + 1);
       // Re-submit — must not throw.
       await harness.mockScenario('simple-stream');
       await expect(
@@ -363,11 +362,11 @@ export function runContractTests(harness: ContractHarness): void {
       );
       expect(tc).toBeDefined();
 
-      const history: Message[] = [
-        { role: 'user', content: 'go' },
-        harness.buildAssistantWithToolCall(tc!),
-      ];
-      const withResult = adapter.appendToolResult(history, tc!.id, { ok: true });
+      const afterAssistant = adapter.appendAssistantToolCall(
+        [{ role: 'user', content: 'go' }],
+        [tc!],
+      );
+      const withResult = adapter.appendToolResult(afterAssistant, tc!.id, { ok: true });
 
       await harness.mockScenario('simple-stream');
       await drainStream(adapter, {
@@ -377,6 +376,34 @@ export function runContractTests(harness: ContractHarness): void {
       const captured = harness.getCapturedRequest();
       expect(captured).not.toBeNull();
       expect(captured!.vendorRawHonored).toBe(true);
+    });
+
+    it('[21] appendAssistantToolCall output + appendToolResult re-stream preserves tool-call id on wire', async () => {
+      await harness.mockScenario('tool-call');
+      const adapter = await init(harness);
+      const first = await drainStream(adapter, {
+        model: harness.toolCapableModel,
+        messages: [{ role: 'user', content: 'go' }],
+        tools: [
+          { name: 'test_tool', description: 'x', parameters: { type: 'object' } },
+        ],
+      });
+      const tc = first.find(
+        (e): e is Extract<LlmEvent, { type: 'toolCall' }> => e.type === 'toolCall',
+      );
+      expect(tc).toBeDefined();
+
+      const history = adapter.appendAssistantToolCall(
+        [{ role: 'user', content: 'go' }],
+        [tc!],
+      );
+      // The appended message must carry vendorRaw in a shape the same adapter
+      // accepts back on stream(). If vendorRaw is undefined, the adapter would
+      // have to reconstruct from role/content only — which is the regression
+      // this check catches.
+      const appended = history[history.length - 1]!;
+      expect(appended.role).toBe('assistant');
+      expect(appended.vendorRaw).toBeDefined();
     });
   });
 }

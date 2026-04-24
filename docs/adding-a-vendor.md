@@ -12,6 +12,10 @@ interface LlmAdapter<A extends AuthSpec = AuthSpec> {
   readonly acceptedAuth: ReadonlyArray<A['kind']>;
   init(auth: A, client?: ClientOptions): Promise<void> | void;
   stream(req: PromptRequest): AsyncIterable<LlmEvent>;
+  appendAssistantToolCall(
+    history: Message[],
+    toolCalls: ReadonlyArray<ToolCallEvent>,
+  ): Message[];
   appendToolResult(history: Message[], toolCallId: string, result: unknown): Message[];
   listAvailableModels(): Promise<ModelInfo[]>;
   warmup?(): Promise<void>;
@@ -72,11 +76,16 @@ Honor `req.signal`. Pass it through to the vendor SDK where supported. On abort,
 
 Tool-call argument deltas are often streamed fragmented by vendors (OpenAI in particular). Accumulate them internally; emit `toolCall` once when the arguments are complete.
 
-### 5. Implement `appendToolResult()`
+### 5. Implement `appendAssistantToolCall()` and `appendToolResult()`
 
-Given a history array, a tool call id, and a tool result, return a new history array with the tool result appended in the vendor's native shape. The returned array MUST be a valid `messages` input for a subsequent `stream()` call on the same adapter.
+These two helpers let stateful callers (e.g. a voice agent maintaining a running history across turns) append the two halves of a tool-call round-trip in your vendor's native shape:
 
-The `vendorRaw` field on Message is an opaque wire shape — use it to preserve vendor-native details (Anthropic tool_use blocks, OpenAI tool_calls arrays, Google functionCall parts). When the adapter sees `vendorRaw` on an assistant message in a subsequent request, use it as the source of truth rather than re-constructing from the normalized fields.
+- `appendAssistantToolCall(history, toolCalls)` — called after `stream()` yields one or more `toolCall` events. Returns a new history with an **assistant turn** that carries the tool calls in whatever wire shape the vendor expects (OpenAI's `tool_calls` array, Anthropic's `content: [{type:'tool_use',...}]` blocks, Gemini's `parts: [{functionCall,...}]`, Bedrock's `content: [{toolUse: ...}]`, etc.).
+- `appendToolResult(history, toolCallId, result)` — called after the caller has executed the tool. Appends a **tool-result message** in the vendor's native shape. The returned array MUST be a valid `messages` input for a subsequent `stream()` call on the same adapter.
+
+The `vendorRaw` field on Message is an opaque wire shape — use it to preserve vendor-native details. When the adapter sees `vendorRaw` on an assistant or tool message in a subsequent request, use it as the source of truth rather than re-constructing from the normalized fields.
+
+Callers MUST invoke `appendAssistantToolCall` before `appendToolResult`; the vendor's API will reject a tool-result message that isn't preceded by the matching assistant turn.
 
 ### 6. Implement `listAvailableModels()`
 
@@ -157,6 +166,7 @@ Here's what the kit verifies. Knowing this in advance helps you design your adap
 | 18 | Empty messages array is rejected with a clear error. |
 | 19 | Multi-turn conversation (4+ messages) is preserved in the upstream request. |
 | 20 | `vendorRaw` on an assistant message round-trips through the next request. |
+| 21 | `appendAssistantToolCall` populates `vendorRaw` so the same adapter accepts the turn back on a subsequent `stream()` call. |
 
 ## Tips
 

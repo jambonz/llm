@@ -1,11 +1,6 @@
 import type { Mock } from 'vitest';
 import { openAIFactory } from '../../../src/adapters/openai/index.js';
-import type {
-  AuthKind,
-  AuthSpec,
-  LlmEvent,
-  Message,
-} from '../../../src/types.js';
+import type { AuthKind, AuthSpec } from '../../../src/types.js';
 import type {
   CapturedRequest,
   ContractHarness,
@@ -99,25 +94,6 @@ export function createOpenAIHarness(mocks: OpenAIMockSpies): ContractHarness {
     toolCapableModel: 'gpt-4o',
     nonToolCapableModel: 'o1-preview',
     emitsToolCallStart: true,
-    buildAssistantWithToolCall(tc: Extract<LlmEvent, { type: 'toolCall' }>): Message {
-      const argsString =
-        typeof tc.arguments === 'string' ? tc.arguments : JSON.stringify(tc.arguments);
-      return {
-        role: 'assistant',
-        content: '',
-        vendorRaw: {
-          role: 'assistant',
-          content: null,
-          tool_calls: [
-            {
-              id: tc.id,
-              type: 'function',
-              function: { name: tc.name, arguments: argsString },
-            },
-          ],
-        },
-      };
-    },
   };
 }
 

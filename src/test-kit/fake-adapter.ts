@@ -10,9 +10,8 @@ import type {
   Message,
   ModelInfo,
   PromptRequest,
+  ToolCallEvent,
 } from '../types.js';
-
-type ToolCallEvent = Extract<LlmEvent, { type: 'toolCall' }>;
 import { assertValidRequest } from '../validate.js';
 import type { CapturedRequest, ContractHarness, ContractScenario } from './types.js';
 
@@ -88,6 +87,27 @@ export class FakeAdapter implements LlmAdapter<ApiKeyAuth> {
       default:
         throw new Error(`FakeAdapter: unknown scenario '${scenario}'`);
     }
+  }
+
+  appendAssistantToolCall(
+    history: Message[],
+    toolCalls: ReadonlyArray<ToolCallEvent>,
+  ): Message[] {
+    return [
+      ...history,
+      {
+        role: 'assistant',
+        content: '',
+        vendorRaw: {
+          role: 'assistant',
+          toolCalls: toolCalls.map((tc) => ({
+            id: tc.id,
+            name: tc.name,
+            arguments: tc.arguments,
+          })),
+        },
+      },
+    ];
   }
 
   appendToolResult(history: Message[], toolCallId: string, result: unknown): Message[] {
@@ -312,15 +332,5 @@ export function createFakeHarness(): FakeHarness {
     toolCapableModel: 'fake-tool-model',
     nonToolCapableModel: 'fake-plain-model',
     emitsToolCallStart: true,
-    buildAssistantWithToolCall(tc: ToolCallEvent): Message {
-      return {
-        role: 'assistant',
-        content: '',
-        vendorRaw: {
-          role: 'assistant',
-          toolCall: { id: tc.id, name: tc.name, arguments: tc.arguments },
-        },
-      };
-    },
   };
 }

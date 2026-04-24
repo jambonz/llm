@@ -7,9 +7,11 @@ import type {
   Message,
   ModelInfo,
   PromptRequest,
+  ToolCallEvent,
   VertexServiceAccountAuth,
 } from '../../types.js';
 import {
+  appendOpenAIAssistantToolCall,
   appendOpenAIToolResult,
   streamFromOpenAI,
 } from '../openai/_streaming.js';
@@ -74,6 +76,13 @@ export class VertexOpenAIAdapter implements LlmAdapter<VertexServiceAccountAuth>
     return streamFromOpenAI(this.ensureClient(), req, {
       knownModels: vertexOpenAIManifest.knownModels,
     });
+  }
+
+  appendAssistantToolCall(
+    history: Message[],
+    toolCalls: ReadonlyArray<ToolCallEvent>,
+  ): Message[] {
+    return appendOpenAIAssistantToolCall(history, toolCalls);
   }
 
   appendToolResult(history: Message[], toolCallId: string, result: unknown): Message[] {

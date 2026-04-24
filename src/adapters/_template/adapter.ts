@@ -6,6 +6,7 @@ import type {
   Message,
   ModelInfo,
   PromptRequest,
+  ToolCallEvent,
 } from '../../types.js';
 import { assertValidRequest } from '../../validate.js';
 import { templateManifest } from './manifest.js';
@@ -55,6 +56,38 @@ export class TemplateAdapter implements LlmAdapter<ApiKeyAuth> {
     // On abort (req.signal?.aborted), yield {type: 'end', finishReason: 'aborted'}
     // and do NOT emit any pending toolCall events.
     throw new Error('TemplateAdapter.stream: not implemented');
+  }
+
+  appendAssistantToolCall(
+    _history: Message[],
+    _toolCalls: ReadonlyArray<ToolCallEvent>,
+  ): Message[] {
+    // TODO: append an assistant turn containing the given tool calls to
+    // history, in the vendor's native shape. This turn must precede the
+    // tool-result messages appended by `appendToolResult()` on the next
+    // `stream()` call.
+    //
+    // Example (OpenAI-style):
+    //   return [
+    //     ...history,
+    //     {
+    //       role: 'assistant',
+    //       content: '',
+    //       vendorRaw: {
+    //         role: 'assistant',
+    //         content: null,
+    //         tool_calls: toolCalls.map((tc) => ({
+    //           id: tc.id,
+    //           type: 'function',
+    //           function: {
+    //             name: tc.name,
+    //             arguments: JSON.stringify(tc.arguments ?? {}),
+    //           },
+    //         })),
+    //       },
+    //     },
+    //   ];
+    throw new Error('TemplateAdapter.appendAssistantToolCall: not implemented');
   }
 
   appendToolResult(

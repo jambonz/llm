@@ -1,11 +1,6 @@
 import type { Mock } from 'vitest';
 import { googleFactory } from '../../../src/adapters/google/index.js';
-import type {
-  AuthKind,
-  AuthSpec,
-  LlmEvent,
-  Message,
-} from '../../../src/types.js';
+import type { AuthKind, AuthSpec } from '../../../src/types.js';
 import type {
   CapturedRequest,
   ContractHarness,
@@ -93,23 +88,6 @@ export function createGoogleHarness(mocks: GoogleMockSpies): ContractHarness {
     toolCapableModel: 'gemini-2.5-flash',
     nonToolCapableModel: null,
     emitsToolCallStart: true,
-    buildAssistantWithToolCall(tc: Extract<LlmEvent, { type: 'toolCall' }>): Message {
-      return {
-        role: 'assistant',
-        content: '',
-        vendorRaw: {
-          role: 'model',
-          parts: [
-            {
-              functionCall: {
-                name: tc.name,
-                args: tc.arguments,
-              },
-            },
-          ],
-        },
-      };
-    },
   };
 }
 

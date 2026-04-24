@@ -144,6 +144,34 @@ export async function* streamFromGemini(
 }
 
 /**
+ * Build an assistant-with-tool-call turn in the Gemini wire shape (role:
+ * 'model', parts: [{functionCall, ...}]). Shared between Google AI Studio
+ * and Vertex-Gemini adapters.
+ */
+export function appendGeminiAssistantToolCall(
+  history: Message[],
+  toolCalls: ReadonlyArray<Extract<LlmEvent, { type: 'toolCall' }>>,
+): Message[] {
+  const wireMessage = {
+    role: 'model',
+    parts: toolCalls.map((tc) => ({
+      functionCall: {
+        name: parseToolName(tc.id),
+        args: tc.arguments ?? {},
+      },
+    })),
+  };
+  return [
+    ...history,
+    {
+      role: 'assistant',
+      content: '',
+      vendorRaw: wireMessage,
+    },
+  ];
+}
+
+/**
  * Build a tool-result message in the Gemini wire shape. Shared between
  * Google AI Studio and Vertex-Gemini adapters.
  */

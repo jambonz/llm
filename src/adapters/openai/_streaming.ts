@@ -165,6 +165,34 @@ export async function* streamFromOpenAI(
   yield endEvent;
 }
 
+export function appendOpenAIAssistantToolCall(
+  history: Message[],
+  toolCalls: ReadonlyArray<Extract<LlmEvent, { type: 'toolCall' }>>,
+): Message[] {
+  const wireMessage = {
+    role: 'assistant',
+    content: null,
+    tool_calls: toolCalls.map((tc) => ({
+      id: tc.id,
+      type: 'function',
+      function: {
+        name: tc.name,
+        arguments: typeof tc.arguments === 'string'
+          ? tc.arguments
+          : JSON.stringify(tc.arguments ?? {}),
+      },
+    })),
+  };
+  return [
+    ...history,
+    {
+      role: 'assistant',
+      content: '',
+      vendorRaw: wireMessage,
+    },
+  ];
+}
+
 export function appendOpenAIToolResult(
   history: Message[],
   toolCallId: string,

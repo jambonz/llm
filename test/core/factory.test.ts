@@ -52,6 +52,7 @@ function buildMock(options: { vendor?: string; authKinds?: AuthKindForManifest[]
       stream: async function* (_req: PromptRequest): AsyncIterable<LlmEvent> {
         yield { type: 'end', finishReason: 'stop' };
       },
+      appendAssistantToolCall: (history: Message[]) => history,
       appendToolResult: (history: Message[]) => history,
       listAvailableModels: async (): Promise<ModelInfo[]> => manifest.knownModels,
     }),
@@ -129,6 +130,7 @@ describe('createLlm', () => {
         stream: async function* () {
           yield { type: 'end', finishReason: 'stop' as const };
         },
+        appendAssistantToolCall: (h: Message[]) => h,
         appendToolResult: (h: Message[]) => h,
         listAvailableModels: async () => [],
       }),

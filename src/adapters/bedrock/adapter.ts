@@ -13,6 +13,7 @@ import type {
   ModelInfo,
   PromptRequest,
   Tool,
+  ToolCallEvent,
 } from '../../types.js';
 import { assertValidRequest } from '../../validate.js';
 import { bedrockManifest } from './manifest.js';
@@ -231,6 +232,30 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
       ...(stopReason ? { rawReason: stopReason } : {}),
     };
     yield endEvent;
+  }
+
+  appendAssistantToolCall(
+    history: Message[],
+    toolCalls: ReadonlyArray<ToolCallEvent>,
+  ): Message[] {
+    const wireMessage = {
+      role: 'assistant',
+      content: toolCalls.map((tc) => ({
+        toolUse: {
+          toolUseId: tc.id,
+          name: tc.name,
+          input: tc.arguments ?? {},
+        },
+      })),
+    };
+    return [
+      ...history,
+      {
+        role: 'assistant',
+        content: '',
+        vendorRaw: wireMessage,
+      },
+    ];
   }
 
   appendToolResult(history: Message[], toolCallId: string, result: unknown): Message[] {

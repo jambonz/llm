@@ -7,8 +7,10 @@ import type {
   Message,
   ModelInfo,
   PromptRequest,
+  ToolCallEvent,
 } from '../../types.js';
 import {
+  appendOpenAIAssistantToolCall,
   appendOpenAIToolResult,
   listOpenAICompatibleModels,
   streamFromOpenAI,
@@ -46,6 +48,13 @@ export class OpenAIAdapter implements LlmAdapter<ApiKeyAuth> {
     return streamFromOpenAI(this.ensureClient(), req, {
       knownModels: openAIManifest.knownModels,
     });
+  }
+
+  appendAssistantToolCall(
+    history: Message[],
+    toolCalls: ReadonlyArray<ToolCallEvent>,
+  ): Message[] {
+    return appendOpenAIAssistantToolCall(history, toolCalls);
   }
 
   appendToolResult(history: Message[], toolCallId: string, result: unknown): Message[] {

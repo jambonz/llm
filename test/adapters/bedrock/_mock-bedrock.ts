@@ -4,12 +4,7 @@ import {
   ConverseStreamCommand,
 } from '@aws-sdk/client-bedrock-runtime';
 import { bedrockFactory } from '../../../src/adapters/bedrock/index.js';
-import type {
-  AuthKind,
-  AuthSpec,
-  LlmEvent,
-  Message,
-} from '../../../src/types.js';
+import type { AuthKind, AuthSpec } from '../../../src/types.js';
 import type {
   CapturedRequest,
   ContractHarness,
@@ -87,24 +82,6 @@ export function createBedrockHarness(
     // All models in the Bedrock manifest advertise tools:true.
     nonToolCapableModel: null,
     emitsToolCallStart: true,
-    buildAssistantWithToolCall(tc: Extract<LlmEvent, { type: 'toolCall' }>): Message {
-      return {
-        role: 'assistant',
-        content: '',
-        vendorRaw: {
-          role: 'assistant',
-          content: [
-            {
-              toolUse: {
-                toolUseId: tc.id,
-                name: tc.name,
-                input: tc.arguments,
-              },
-            },
-          ],
-        },
-      };
-    },
   };
 }
 

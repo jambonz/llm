@@ -1,12 +1,6 @@
 import type { Mock } from 'vitest';
 import { vertexOpenAIFactory } from '../../../src/adapters/vertex-openai/index.js';
-import type {
-  AuthKind,
-  AuthSpec,
-  LlmEvent,
-  Message,
-  ServiceAccountJson,
-} from '../../../src/types.js';
+import type { AuthKind, AuthSpec, ServiceAccountJson } from '../../../src/types.js';
 import type {
   CapturedRequest,
   ContractHarness,
@@ -98,24 +92,5 @@ export function createVertexOpenAIHarness(mocks: VertexOpenAIMockSpies): Contrac
     toolCapableModel: 'mistral-large',
     nonToolCapableModel: null,
     emitsToolCallStart: true,
-    buildAssistantWithToolCall(tc: Extract<LlmEvent, { type: 'toolCall' }>): Message {
-      const argsString =
-        typeof tc.arguments === 'string' ? tc.arguments : JSON.stringify(tc.arguments);
-      return {
-        role: 'assistant',
-        content: '',
-        vendorRaw: {
-          role: 'assistant',
-          content: null,
-          tool_calls: [
-            {
-              id: tc.id,
-              type: 'function',
-              function: { name: tc.name, arguments: argsString },
-            },
-          ],
-        },
-      };
-    },
   };
 }

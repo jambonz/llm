@@ -65,6 +65,7 @@ export type {
   Role,
   ServiceAccountJson,
   Tool,
+  ToolCallEvent,
   Usage,
   VertexServiceAccountAuth,
 } from './types.js';

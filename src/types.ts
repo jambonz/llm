@@ -85,6 +85,9 @@ export type LlmEvent =
   | { type: 'toolCall'; id: string; name: string; arguments: unknown }
   | { type: 'end'; finishReason: FinishReason; usage?: Usage; rawReason?: string };
 
+/** Convenience alias for the fully-accumulated tool-call event shape. */
+export type ToolCallEvent = Extract<LlmEvent, { type: 'toolCall' }>;
+
 export type FinishReason =
   | 'stop'
   | 'tool'
@@ -255,8 +258,9 @@ export interface FormField {
  *   1. Declares which auth kinds it accepts (`acceptedAuth`).
  *   2. Initializes a client from an `AuthSpec` (`init`).
  *   3. Streams a prompt as an AsyncIterable of `LlmEvent`s (`stream`).
- *   4. Appends a tool result to history in the vendor's native shape (`appendToolResult`).
- *   5. Lists models accessible to the credential (`listAvailableModels`).
+ *   4. Appends an assistant-with-tool-call turn to history (`appendAssistantToolCall`).
+ *   5. Appends a tool result to history in the vendor's native shape (`appendToolResult`).
+ *   6. Lists models accessible to the credential (`listAvailableModels`).
  *
  * The `manifest` is exported as a module-level constant alongside the adapter.
  * See src/adapters/_template/ for a working skeleton.
@@ -283,9 +287,27 @@ export interface LlmAdapter<A extends AuthSpec = AuthSpec> {
   stream(req: PromptRequest): AsyncIterable<LlmEvent>;
 
   /**
+   * Append an assistant turn containing one or more tool calls to history,
+   * in the vendor's native shape. Stateful callers use this after `stream()`
+   * yields `toolCall` events to build the assistant turn that must precede
+   * the tool-result messages on the next `stream()` call.
+   *
+   * Vendors encode this turn differently (OpenAI: `{role:'assistant',
+   * content:null, tool_calls:[...]}`; Anthropic: `{role:'assistant',
+   * content:[{type:'tool_use',...}]}`; Google: `{role:'model',
+   * parts:[{functionCall,...}]}`; etc.). The returned `Message` carries the
+   * wire shape in `vendorRaw` and is round-trippable through `stream()`.
+   */
+  appendAssistantToolCall(
+    history: Message[],
+    toolCalls: ReadonlyArray<ToolCallEvent>,
+  ): Message[];
+
+  /**
    * Append a tool-result message to history in the vendor's native shape.
    * The returned array MUST be a valid `messages` input for a subsequent `stream()` call
-   * on the same adapter.
+   * on the same adapter. Callers MUST have already appended the preceding
+   * assistant-with-tool-call turn via `appendAssistantToolCall`.
    */
   appendToolResult(history: Message[], toolCallId: string, result: unknown): Message[];
 

@@ -1,11 +1,6 @@
 import type { Mock } from 'vitest';
 import { anthropicFactory } from '../../../src/adapters/anthropic/index.js';
-import type {
-  AuthKind,
-  AuthSpec,
-  LlmEvent,
-  Message,
-} from '../../../src/types.js';
+import type { AuthKind, AuthSpec } from '../../../src/types.js';
 import type {
   CapturedRequest,
   ContractHarness,
@@ -84,23 +79,6 @@ export function createAnthropicHarness(mocks: AnthropicMockSpies): ContractHarne
     // All Claude models in the manifest support tools, so check #16 is skipped.
     nonToolCapableModel: null,
     emitsToolCallStart: true,
-    buildAssistantWithToolCall(tc: Extract<LlmEvent, { type: 'toolCall' }>): Message {
-      return {
-        role: 'assistant',
-        content: '',
-        vendorRaw: {
-          role: 'assistant',
-          content: [
-            {
-              type: 'tool_use',
-              id: tc.id,
-              name: tc.name,
-              input: tc.arguments,
-            },
-          ],
-        },
-      };
-    },
   };
 }
 

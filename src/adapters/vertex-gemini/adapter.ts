@@ -6,9 +6,11 @@ import type {
   Message,
   ModelInfo,
   PromptRequest,
+  ToolCallEvent,
   VertexServiceAccountAuth,
 } from '../../types.js';
 import {
+  appendGeminiAssistantToolCall,
   appendGeminiToolResult,
   listGeminiModels,
   streamFromGemini,
@@ -60,6 +62,13 @@ export class VertexGeminiAdapter implements LlmAdapter<VertexServiceAccountAuth>
 
   stream(req: PromptRequest): AsyncIterable<LlmEvent> {
     return streamFromGemini(this.ensureClient(), req);
+  }
+
+  appendAssistantToolCall(
+    history: Message[],
+    toolCalls: ReadonlyArray<ToolCallEvent>,
+  ): Message[] {
+    return appendGeminiAssistantToolCall(history, toolCalls);
   }
 
   appendToolResult(history: Message[], toolCallId: string, result: unknown): Message[] {

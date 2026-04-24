@@ -9,6 +9,7 @@ import type {
   ModelInfo,
   PromptRequest,
   Tool,
+  ToolCallEvent,
 } from '../../types.js';
 import { assertValidRequest } from '../../validate.js';
 import { anthropicManifest } from './manifest.js';
@@ -206,6 +207,29 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
       ...(stopReason ? { rawReason: stopReason } : {}),
     };
     yield endEvent;
+  }
+
+  appendAssistantToolCall(
+    history: Message[],
+    toolCalls: ReadonlyArray<ToolCallEvent>,
+  ): Message[] {
+    const wireMessage = {
+      role: 'assistant',
+      content: toolCalls.map((tc) => ({
+        type: 'tool_use',
+        id: tc.id,
+        name: tc.name,
+        input: tc.arguments ?? {},
+      })),
+    };
+    return [
+      ...history,
+      {
+        role: 'assistant',
+        content: '',
+        vendorRaw: wireMessage,
+      },
+    ];
   }
 
   appendToolResult(history: Message[], toolCallId: string, result: unknown): Message[] {

@@ -1,12 +1,6 @@
 import type { Mock } from 'vitest';
 import { vertexGeminiFactory } from '../../../src/adapters/vertex-gemini/index.js';
-import type {
-  AuthKind,
-  AuthSpec,
-  LlmEvent,
-  Message,
-  ServiceAccountJson,
-} from '../../../src/types.js';
+import type { AuthKind, AuthSpec, ServiceAccountJson } from '../../../src/types.js';
 import type {
   CapturedRequest,
   ContractHarness,
@@ -101,22 +95,5 @@ export function createVertexGeminiHarness(mocks: VertexGeminiMockSpies): Contrac
     toolCapableModel: 'gemini-2.5-flash',
     nonToolCapableModel: null,
     emitsToolCallStart: true,
-    buildAssistantWithToolCall(tc: Extract<LlmEvent, { type: 'toolCall' }>): Message {
-      return {
-        role: 'assistant',
-        content: '',
-        vendorRaw: {
-          role: 'model',
-          parts: [
-            {
-              functionCall: {
-                name: tc.name,
-                args: tc.arguments,
-              },
-            },
-          ],
-        },
-      };
-    },
   };
 }
