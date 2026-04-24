@@ -16,6 +16,7 @@ import { googleFactory } from './google/index.js';
 import { vertexGeminiFactory } from './vertex-gemini/index.js';
 import { vertexOpenAIFactory } from './vertex-openai/index.js';
 import { bedrockFactory } from './bedrock/index.js';
+import { azureOpenAIFactory } from './azure-openai/index.js';
 
 registerAdapter(openAIFactory);
 registerAdapter(deepseekFactory);
@@ -24,3 +25,4 @@ registerAdapter(googleFactory);
 registerAdapter(vertexGeminiFactory);
 registerAdapter(vertexOpenAIFactory);
 registerAdapter(bedrockFactory);
+registerAdapter(azureOpenAIFactory);

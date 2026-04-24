@@ -198,6 +198,36 @@ describe('normalizeAuth', () => {
     });
   });
 
+  describe('azure-openai', () => {
+    const validRaw = {
+      api_key: 'test-key',
+      endpoint: 'https://r.openai.azure.com',
+      deployment: 'prod',
+      api_version: '2024-10-21',
+    };
+
+    it('maps all four fields to AzureOpenAIApiKeyAuth', () => {
+      const result = normalizeAuth('azure-openai', validRaw);
+      expect(result).toEqual({
+        kind: 'azureOpenAIApiKey',
+        apiKey: 'test-key',
+        endpoint: 'https://r.openai.azure.com',
+        deployment: 'prod',
+        apiVersion: '2024-10-21',
+      });
+    });
+
+    it.each(['api_key', 'endpoint', 'deployment', 'api_version'] as const)(
+      'throws when %s is missing',
+      (missing) => {
+        const raw = { ...validRaw, [missing]: undefined };
+        expect(() => normalizeAuth('azure-openai', raw)).toThrowError(
+          new RegExp(missing),
+        );
+      },
+    );
+  });
+
   describe('unknown vendor', () => {
     it('throws a helpful error', () => {
       expect(() => normalizeAuth('unknown-vendor', { api_key: 'x' })).toThrowError(

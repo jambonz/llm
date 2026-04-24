@@ -8,6 +8,8 @@
  *   - `createLlm({vendor, auth, client?})` to get a ready-to-stream adapter instance.
  *   - `getManifest()` to enumerate registered vendors (used by api-server).
  *   - `normalizeAuth(vendor, rawCred)` to convert DB-shape creds to AuthSpec.
+ *   - `pickAuthKind(vendor, rawCred)` to pick the right manifest authKind for
+ *     a raw credential (used by api-server's `encryptCredential`).
  *   - `registerAdapter(factory)` to add a custom adapter at runtime.
  */
 
@@ -45,6 +47,7 @@ export type {
   AuthKind,
   AuthKindSchema,
   AuthSpec,
+  AzureOpenAIApiKeyAuth,
   BedrockApiKeyAuth,
   BedrockIamAuth,
   ClientOptions,
@@ -72,6 +75,9 @@ export type {
 
 export { normalizeAuth } from './normalize-auth.js';
 export type { RawCredential } from './normalize-auth.js';
+
+export { pickAuthKind } from './pick-auth-kind.js';
+export type { RawCredentialLoose } from './pick-auth-kind.js';
 
 export { assertValidRequest } from './validate.js';
 
