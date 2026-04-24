@@ -11,18 +11,18 @@
 
 import { registerAdapter } from '../registry.js';
 import { openAIFactory, deepseekFactory } from './openai/index.js';
+import { anthropicFactory } from './anthropic/index.js';
 
 registerAdapter(openAIFactory);
 registerAdapter(deepseekFactory);
+registerAdapter(anthropicFactory);
 
 // Future registrations land here as each adapter is ported:
-// import { anthropicFactory } from './anthropic/index.js';
 // import { googleFactory } from './google/index.js';
 // import { vertexGeminiFactory } from './vertex-gemini/index.js';
 // import { vertexOpenAIFactory } from './vertex-openai/index.js';
 // import { bedrockFactory } from './bedrock/index.js';
 //
-// registerAdapter(anthropicFactory);
 // registerAdapter(googleFactory);
 // registerAdapter(vertexGeminiFactory);
 // registerAdapter(vertexOpenAIFactory);
