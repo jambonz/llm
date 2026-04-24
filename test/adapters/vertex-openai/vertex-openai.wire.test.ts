@@ -176,6 +176,54 @@ describe('VertexOpenAIAdapter — wire', () => {
     }
   });
 
+  it('Vertex array-wrapped error bodies are unwrapped so the OpenAI SDK can parse them', async () => {
+    const origFetch = globalThis.fetch;
+    // This is the exact shape Vertex returns on model-not-in-region 404s —
+    // a single-element array with an {error: {...}} object inside.
+    const arrayBody = JSON.stringify([
+      {
+        error: {
+          code: 404,
+          message:
+            'Publisher Model ... was not found or your project does not have access to it.',
+          status: 'NOT_FOUND',
+        },
+      },
+    ]);
+    const fetchSpy = vi.fn(
+      async () =>
+        new Response(arrayBody, {
+          status: 404,
+          statusText: 'Not Found',
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    try {
+      await createLlm({
+        vendor: 'vertex-openai',
+        auth: {
+          kind: 'vertexServiceAccount',
+          credentials: SERVICE_KEY,
+          projectId: 'p',
+          location: 'us-central1',
+        },
+      });
+      const [opts] = mocks.openaiConstructorSpy.mock.calls[0]!;
+      const customFetch = opts.fetch as typeof fetch;
+      const rebuilt = await customFetch('https://example.com/path', { method: 'POST' });
+      const bodyText = await rebuilt.text();
+      // Array unwrapped — body is the inner object, which the OpenAI SDK
+      // will successfully read `.error.message` off of.
+      const parsed = JSON.parse(bodyText);
+      expect(Array.isArray(parsed)).toBe(false);
+      expect(parsed.error.code).toBe(404);
+      expect(parsed.error.message).toContain('not found or your project does not have access');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
   it('empty 404 body gets an appended hint about regional model availability', async () => {
     const origFetch = globalThis.fetch;
     const fetchSpy = vi.fn(

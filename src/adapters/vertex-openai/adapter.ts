@@ -183,14 +183,35 @@ async function surfaceErrorBody(
     );
   }
 
+  // Vertex wraps errors in a single-element JSON array: `[{error: {...}}]`.
+  // The OpenAI SDK expects a bare object `{error: {...}}`, so when parsing
+  // the array it fails to find `.error` and throws "no body". Unwrap the
+  // array so the SDK's error.message carries the vendor's own text.
+  const normalizedBody = unwrapVertexErrorArray(body) + hint;
+
   // Drop encoding headers so the SDK doesn't try to decompress plain text.
   const headers = new Headers(response.headers);
   headers.delete('content-encoding');
   headers.delete('content-length');
 
-  return new Response(body + hint, {
+  return new Response(normalizedBody, {
     status: response.status,
     statusText: response.statusText,
     headers,
   });
+}
+
+function unwrapVertexErrorArray(body: string): string {
+  if (!body) return body;
+  const trimmed = body.trim();
+  if (!trimmed.startsWith('[')) return body;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed) && parsed.length === 1 && parsed[0]?.error) {
+      return JSON.stringify(parsed[0]);
+    }
+  } catch {
+    // not JSON; leave as-is
+  }
+  return body;
 }
