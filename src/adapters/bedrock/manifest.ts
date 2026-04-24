@@ -26,6 +26,13 @@ import type { AdapterManifest, ModelInfo } from '../../types.js';
  * because on-demand invocation of plain `anthropic.claude-*-4-*` ids is no
  * longer available in most regions — Bedrock requires the profile. Operators
  * in EU/APAC should edit to `eu.`/`apac.` or enter a region-specific id.
+ *
+ * FORMAT CONTRACT: `scripts/check-bedrock-models.ts --write` edits this file
+ * in place by text substitution. Each entry MUST preserve the current shape:
+ * an object literal whose first line is `    id: '<id>',` (two-space indent
+ * plus trailing comma) and whose closing brace is on a line with exactly two
+ * spaces of indent. If you restructure this array (e.g. move to JSON import),
+ * update the script's edit strategy.
  */
 const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
   {
