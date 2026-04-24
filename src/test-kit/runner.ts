@@ -259,14 +259,9 @@ export function runContractTests(harness: ContractHarness): void {
         (e): e is Extract<LlmEvent, { type: 'toolCall' }> => e.type === 'toolCall',
       );
       expect(tc).toBeDefined();
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: '',
-        vendorRaw: { toolCall: tc },
-      };
       const history: Message[] = [
         { role: 'user', content: 'call it' },
-        assistantMessage,
+        harness.buildAssistantWithToolCall(tc!),
       ];
       const withResult = adapter.appendToolResult(history, tc!.id, { ok: true });
       expect(withResult.length).toBe(history.length + 1);
@@ -370,11 +365,7 @@ export function runContractTests(harness: ContractHarness): void {
 
       const history: Message[] = [
         { role: 'user', content: 'go' },
-        {
-          role: 'assistant',
-          content: '',
-          vendorRaw: { toolCallEvent: tc },
-        },
+        harness.buildAssistantWithToolCall(tc!),
       ];
       const withResult = adapter.appendToolResult(history, tc!.id, { ok: true });
 

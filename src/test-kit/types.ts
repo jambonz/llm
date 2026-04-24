@@ -1,4 +1,10 @@
-import type { AdapterFactory, AuthKind, AuthSpec } from '../types.js';
+import type {
+  AdapterFactory,
+  AuthKind,
+  AuthSpec,
+  LlmEvent,
+  Message,
+} from '../types.js';
 
 /**
  * Named scenarios the harness must be able to stage. Each scenario configures
@@ -99,4 +105,16 @@ export interface ContractHarness {
    * (toolCallStart precedes toolCall) runs; if false, that check is skipped.
    */
   emitsToolCallStart: boolean;
+
+  /**
+   * Construct an assistant `Message` (with `vendorRaw` populated in the shape
+   * THIS adapter expects back on re-submission) given a `toolCall` event the
+   * adapter previously emitted. Used by checks #13 and #20 to round-trip a
+   * realistic history through a subsequent `stream()` call.
+   *
+   * Implementation tip: set `vendorRaw` to the full vendor-native assistant
+   * message — the same shape your adapter puts in history after emitting a
+   * tool call during streaming.
+   */
+  buildAssistantWithToolCall(tc: Extract<LlmEvent, { type: 'toolCall' }>): Message;
 }

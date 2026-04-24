@@ -11,6 +11,8 @@ import type {
   ModelInfo,
   PromptRequest,
 } from '../types.js';
+
+type ToolCallEvent = Extract<LlmEvent, { type: 'toolCall' }>;
 import { assertValidRequest } from '../validate.js';
 import type { CapturedRequest, ContractHarness, ContractScenario } from './types.js';
 
@@ -310,5 +312,15 @@ export function createFakeHarness(): FakeHarness {
     toolCapableModel: 'fake-tool-model',
     nonToolCapableModel: 'fake-plain-model',
     emitsToolCallStart: true,
+    buildAssistantWithToolCall(tc: ToolCallEvent): Message {
+      return {
+        role: 'assistant',
+        content: '',
+        vendorRaw: {
+          role: 'assistant',
+          toolCall: { id: tc.id, name: tc.name, arguments: tc.arguments },
+        },
+      };
+    },
   };
 }
