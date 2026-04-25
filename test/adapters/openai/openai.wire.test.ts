@@ -471,4 +471,74 @@ describe('OpenAI adapter — wire format', () => {
       tokens_remaining: 999500,
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // clientTiming breakdown
+  // ---------------------------------------------------------------------------
+
+  it('attaches clientTiming with request/headers/first-token/total breakdown', async () => {
+    const streamObj = {
+      async *[Symbol.asyncIterator]() {
+        yield {
+          choices: [{ index: 0, delta: { content: 'hi' }, finish_reason: null }],
+        };
+        yield { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+      },
+    };
+    const fakeApiPromise = {
+      withResponse: async () => ({
+        data: streamObj,
+        response: { headers: new Headers() },
+      }),
+      then: (onFulfilled: (s: typeof streamObj) => unknown) =>
+        Promise.resolve(streamObj).then(onFulfilled),
+    };
+    mocks.create.mockReturnValueOnce(fakeApiPromise);
+
+    const adapter = await buildAdapter();
+    const events = await drain(adapter, {
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    const end = events.find((e) => e.type === 'end') as Extract<
+      LlmEvent,
+      { type: 'end' }
+    >;
+    expect(end.clientTiming).toBeDefined();
+    expect(typeof end.clientTiming!.requestToHeadersMs).toBe('number');
+    expect(typeof end.clientTiming!.headersToFirstTokenMs).toBe('number');
+    expect(typeof end.clientTiming!.totalMs).toBe('number');
+    expect(end.clientTiming!.totalMs).toBeGreaterThanOrEqual(
+      end.clientTiming!.requestToHeadersMs,
+    );
+  });
+
+  it('omits headersToFirstTokenMs when no content token was emitted', async () => {
+    const streamObj = {
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+      },
+    };
+    const fakeApiPromise = {
+      withResponse: async () => ({
+        data: streamObj,
+        response: { headers: new Headers() },
+      }),
+      then: (onFulfilled: (s: typeof streamObj) => unknown) =>
+        Promise.resolve(streamObj).then(onFulfilled),
+    };
+    mocks.create.mockReturnValueOnce(fakeApiPromise);
+
+    const adapter = await buildAdapter();
+    const events = await drain(adapter, {
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    const end = events.find((e) => e.type === 'end') as Extract<
+      LlmEvent,
+      { type: 'end' }
+    >;
+    expect(end.clientTiming).toBeDefined();
+    expect(end.clientTiming!.headersToFirstTokenMs).toBeUndefined();
+  });
 });

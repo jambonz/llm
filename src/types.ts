@@ -101,6 +101,29 @@ export type LlmEvent =
        * `vendor_metadata`.
        */
       vendorMetadata?: Record<string, string | number>;
+      /**
+       * Optional client-side timing breakdown for diagnosing latency.
+       * Captured by the adapter using `process.hrtime`. Numbers are
+       * milliseconds. When present:
+       *   - `requestToHeadersMs`: from when the SDK call was initiated
+       *     to when response headers were received. Includes TLS/TCP
+       *     handshake (if connection was cold), network RTT in both
+       *     directions, and any vendor-side queueing/processing time
+       *     before the first byte.
+       *   - `headersToFirstTokenMs`: from response headers received to
+       *     first content chunk emitted. Usually small (<50ms) if the
+       *     vendor is streaming normally; larger values suggest SSE
+       *     buffering or chunk-transfer issues. Undefined if no token
+       *     was emitted (error or empty response).
+       *   - `totalMs`: full wall-clock from SDK call to stream end.
+       * Adapters that cannot measure these (different SDK shape) omit
+       * the field entirely.
+       */
+      clientTiming?: {
+        requestToHeadersMs: number;
+        headersToFirstTokenMs?: number;
+        totalMs: number;
+      };
     };
 
 /** Convenience alias for the fully-accumulated tool-call event shape. */
