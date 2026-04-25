@@ -100,8 +100,9 @@ export const azureOpenAIManifest: AdapterManifest = {
           type: 'password',
           required: true,
           help:
-            'Azure OpenAI resource key. Find it in the Azure portal under ' +
-            'your OpenAI resource → Keys and Endpoint.',
+            'In Azure AI Foundry, open the deployment and copy the Key from ' +
+            'the Endpoint panel (eye icon to reveal). Same key is shown in ' +
+            'the Azure portal under your OpenAI resource → Keys and Endpoint.',
         },
         {
           name: 'endpoint',
@@ -109,8 +110,12 @@ export const azureOpenAIManifest: AdapterManifest = {
           type: 'url',
           required: true,
           help:
-            'Resource endpoint URL, e.g. https://my-resource.openai.azure.com. ' +
-            'Shown in the Azure portal alongside the keys.',
+            'Resource hostname only — no path, no query string. Example: ' +
+            'https://my-resource.openai.azure.com. The Foundry deployment ' +
+            'page shows a Target URI like ' +
+            'https://my-resource.openai.azure.com/openai/responses?api-version=… ' +
+            'Strip everything from /openai/ onward and paste only the part ' +
+            'before it.',
         },
         {
           name: 'deployment',
@@ -118,8 +123,9 @@ export const azureOpenAIManifest: AdapterManifest = {
           type: 'text',
           required: true,
           help:
-            'The name you chose for the deployment in Azure AI Studio ' +
-            '(NOT the underlying model id — deployments can be named anything).',
+            'The Name shown at the top of the deployment page in Azure AI ' +
+            'Foundry (also under Deployment info → Name). NOT the underlying ' +
+            'model id — deployments can be named anything you chose at create time.',
         },
         {
           name: 'apiVersion',
@@ -128,11 +134,11 @@ export const azureOpenAIManifest: AdapterManifest = {
           required: true,
           default: '2025-03-01-preview',
           help:
-            'Data-plane api-version, e.g. 2025-03-01-preview. Microsoft rolls ' +
-            'these frequently; newer gpt-5 / o-series deployments require ' +
-            'an api-version that supports the Responses API (2025-03-01-preview ' +
-            'or later). See Azure OpenAI API reference docs for the current ' +
-            'recommended version.',
+            'Data-plane api-version. Visible in Foundry as the ?api-version=… ' +
+            'query string in the Target URI, or the api_version=… line in the ' +
+            'Python sample. The default 2025-03-01-preview is the minimum that ' +
+            'works with gpt-5 / o-series deployments — Azure routes those ' +
+            'through the Responses API internally and rejects older versions.',
         },
       ],
     },
