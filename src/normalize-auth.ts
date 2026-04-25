@@ -42,7 +42,7 @@ export interface RawCredential {
  *
  * Supported vendors: openai, deepseek, anthropic, google, vertex (alias for
  * vertex-gemini + vertex-openai — both accept the same auth shape), vertex-gemini,
- * vertex-openai, bedrock, azure-openai, groq.
+ * vertex-openai, bedrock, azure-openai, groq, huggingface.
  *
  * Throws with a clear message if the raw credential is missing required fields.
  */
@@ -51,8 +51,10 @@ export function normalizeAuth(vendor: string, raw: RawCredential): AuthSpec {
     case 'openai':
     case 'anthropic':
     case 'groq':
-      // Groq uses standard ApiKeyAuth; the adapter defaults baseURL to
-      // api.groq.com/openai/v1 in init() if the caller doesn't supply one.
+    case 'huggingface':
+      // Groq and HuggingFace use standard ApiKeyAuth; their adapters default
+      // baseURL in init() if the caller doesn't supply one (api.groq.com and
+      // router.huggingface.co respectively).
       return requireApiKey(vendor, raw);
 
     case 'deepseek':

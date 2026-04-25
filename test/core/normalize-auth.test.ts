@@ -59,6 +59,29 @@ describe('normalizeAuth', () => {
     });
   });
 
+  describe('huggingface', () => {
+    it('maps api_key to ApiKeyAuth (no forced baseURL — adapter defaults to router.huggingface.co)', () => {
+      expect(normalizeAuth('huggingface', { api_key: 'hf_xyz' })).toEqual({
+        kind: 'apiKey',
+        apiKey: 'hf_xyz',
+      });
+    });
+
+    it('passes through caller-supplied api_url (for proxy use)', () => {
+      expect(
+        normalizeAuth('huggingface', { api_key: 'hf_xyz', api_url: 'https://my-proxy/v1' }),
+      ).toEqual({
+        kind: 'apiKey',
+        apiKey: 'hf_xyz',
+        baseURL: 'https://my-proxy/v1',
+      });
+    });
+
+    it('throws when api_key is missing', () => {
+      expect(() => normalizeAuth('huggingface', {})).toThrowError(/requires 'api_key'/);
+    });
+  });
+
   describe('deepseek', () => {
     it('defaults baseURL to deepseek hosted endpoint', () => {
       expect(normalizeAuth('deepseek', { api_key: 'sk' })).toEqual({

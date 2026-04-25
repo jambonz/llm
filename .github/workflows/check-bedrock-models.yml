@@ -21,9 +21,9 @@ jobs:
       contents: write        # peter-evans/create-pull-request writes the branch
       pull-requests: write   # …and opens the PR
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 

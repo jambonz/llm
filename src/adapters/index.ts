@@ -18,6 +18,7 @@ import { vertexOpenAIFactory } from './vertex-openai/index.js';
 import { bedrockFactory } from './bedrock/index.js';
 import { azureOpenAIFactory } from './azure-openai/index.js';
 import { groqFactory } from './groq/index.js';
+import { huggingfaceFactory } from './huggingface/index.js';
 
 registerAdapter(openAIFactory);
 registerAdapter(deepseekFactory);
@@ -28,3 +29,4 @@ registerAdapter(vertexOpenAIFactory);
 registerAdapter(bedrockFactory);
 registerAdapter(azureOpenAIFactory);
 registerAdapter(groqFactory);
+registerAdapter(huggingfaceFactory);
