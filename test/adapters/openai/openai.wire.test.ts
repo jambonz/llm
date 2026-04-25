@@ -364,4 +364,67 @@ describe('OpenAI adapter — wire format', () => {
       createLlm({ vendor: 'deepseek', auth: { kind: 'apiKey', apiKey: 'sk-ds' } }),
     ).resolves.toBeDefined();
   });
+
+  // ---------------------------------------------------------------------------
+  // max_tokens / max_completion_tokens heuristic
+  // ---------------------------------------------------------------------------
+
+  it('sends legacy max_tokens for gpt-4o (unchanged default behavior)', async () => {
+    mocks.create.mockResolvedValueOnce(
+      mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
+    );
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'hi' }],
+      maxTokens: 42,
+    });
+    const [body] = mocks.create.mock.calls[0]!;
+    expect(body.max_tokens).toBe(42);
+    expect(body.max_completion_tokens).toBeUndefined();
+  });
+
+  it('switches to max_completion_tokens for o1-preview (reasoning)', async () => {
+    mocks.create.mockResolvedValueOnce(
+      mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
+    );
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: 'o1-preview',
+      messages: [{ role: 'user', content: 'hi' }],
+      maxTokens: 42,
+    });
+    const [body] = mocks.create.mock.calls[0]!;
+    expect(body.max_completion_tokens).toBe(42);
+    expect(body.max_tokens).toBeUndefined();
+  });
+
+  it('switches to max_completion_tokens for gpt-5 family', async () => {
+    mocks.create.mockResolvedValueOnce(
+      mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
+    );
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: 'gpt-5-mini',
+      messages: [{ role: 'user', content: 'hi' }],
+      maxTokens: 42,
+    });
+    const [body] = mocks.create.mock.calls[0]!;
+    expect(body.max_completion_tokens).toBe(42);
+    expect(body.max_tokens).toBeUndefined();
+  });
+
+  it('omits both params when maxTokens is not supplied', async () => {
+    mocks.create.mockResolvedValueOnce(
+      mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
+    );
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    const [body] = mocks.create.mock.calls[0]!;
+    expect(body.max_tokens).toBeUndefined();
+    expect(body.max_completion_tokens).toBeUndefined();
+  });
 });

@@ -68,8 +68,15 @@ export class AzureOpenAIAdapter implements LlmAdapter<AzureOpenAIApiKeyAuth> {
   }
 
   stream(req: PromptRequest): AsyncIterable<LlmEvent> {
+    // Azure deployment names are arbitrary user strings (e.g. `prod-gpt-4o`,
+    // `my-assistant`, `gpt-5.4-mini`) — the model-id heuristic in
+    // streamFromOpenAI can't see the underlying model, so pin the newer
+    // parameter name. Microsoft's current Azure OpenAI backend accepts
+    // `max_completion_tokens` for gpt-4o-family and requires it for
+    // gpt-5-family / o-series reasoning models.
     return streamFromOpenAI(this.ensureClient(), req, {
       knownModels: azureOpenAIManifest.knownModels,
+      tokensParam: 'max_completion_tokens',
     });
   }
 
@@ -103,9 +110,14 @@ export class AzureOpenAIAdapter implements LlmAdapter<AzureOpenAIApiKeyAuth> {
       // still requires it as a parameter.
       model: 'probe',
       messages: [{ role: 'user', content: 'ping' }],
-      max_tokens: 1,
+      // Use `max_completion_tokens` (not legacy `max_tokens`): gpt-5 family
+      // and o-series reasoning models return 400 on the legacy parameter.
+      // The newer name is a superset — also accepted by gpt-4o, gpt-4-turbo,
+      // and gpt-3.5-turbo deployments — so it's the safe choice for a probe
+      // that has to work regardless of the underlying deployment model.
+      max_completion_tokens: 1,
       stream: false,
-    });
+    } as Parameters<typeof client.chat.completions.create>[0]);
   }
 
   async warmup(): Promise<void> {

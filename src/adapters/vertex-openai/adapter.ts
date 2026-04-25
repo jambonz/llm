@@ -87,6 +87,11 @@ export class VertexOpenAIAdapter implements LlmAdapter<VertexServiceAccountAuth>
     return streamFromOpenAI(this.ensureClient(), req, {
       knownModels: vertexOpenAIManifest.knownModels,
       defaultMaxTokens: 4096,
+      // Pin legacy `max_tokens`: Vertex's OpenAI-compat partner-model
+      // endpoint predates `max_completion_tokens` and may not recognize it.
+      // The model-id heuristic wouldn't catch a partner model named in the
+      // OpenAI style (unlikely today, but defensive).
+      tokensParam: 'max_tokens',
     });
   }
 
