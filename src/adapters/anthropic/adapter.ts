@@ -12,7 +12,20 @@ import type {
   ToolCallEvent,
 } from '../../types.js';
 import { assertValidRequest } from '../../validate.js';
+import { makeMetadataExtractor } from '../_metadata.js';
 import { anthropicManifest } from './manifest.js';
+
+/**
+ * Anthropic response-header diagnostics. `request-id` is the support-ticket
+ * id; the rate-limit headers help operators see when an account is
+ * approaching limits across turns within a call.
+ */
+const ANTHROPIC_METADATA_EXTRACTOR = makeMetadataExtractor([
+  { header: 'request-id', key: 'request_id' },
+  { header: 'anthropic-ratelimit-requests-remaining', key: 'requests_remaining', numeric: true },
+  { header: 'anthropic-ratelimit-input-tokens-remaining', key: 'input_tokens_remaining', numeric: true },
+  { header: 'anthropic-ratelimit-output-tokens-remaining', key: 'output_tokens_remaining', numeric: true },
+]);
 
 /**
  * Adapter for Anthropic Claude.
@@ -68,11 +81,29 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
     if (req.temperature !== undefined) body.temperature = req.temperature;
 
     let stream;
+    let responseHeaders: Headers | undefined;
     try {
-      stream = await client.messages.create(
+      // Production: `.withResponse()` on the Anthropic SDK's APIPromise
+      // exposes the underlying HTTP `Response` for header diagnostics.
+      // Test mocks return the stream directly with no APIPromise wrapper;
+      // fall through to plain await when `.withResponse` isn't present.
+      const apiPromise = client.messages.create(
         body as unknown as Parameters<typeof client.messages.create>[0],
         { signal: req.signal },
       );
+      const maybeWithResponse = (apiPromise as unknown as {
+        withResponse?: () => Promise<{
+          data: Awaited<typeof apiPromise>;
+          response: { headers?: Headers };
+        }>;
+      }).withResponse;
+      if (typeof maybeWithResponse === 'function') {
+        const result = await maybeWithResponse.call(apiPromise);
+        stream = result.data;
+        responseHeaders = result.response?.headers;
+      } else {
+        stream = await apiPromise;
+      }
     } catch (err) {
       if (isAbortError(err)) {
         yield { type: 'end', finishReason: 'aborted' };
@@ -206,6 +237,14 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
       ...(usage ? { usage } : {}),
       ...(stopReason ? { rawReason: stopReason } : {}),
     };
+
+    if (responseHeaders) {
+      const metadata = ANTHROPIC_METADATA_EXTRACTOR(responseHeaders);
+      if (Object.keys(metadata).length > 0) {
+        endEvent.vendorMetadata = metadata;
+      }
+    }
+
     yield endEvent;
   }
 

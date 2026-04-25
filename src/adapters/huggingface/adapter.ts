@@ -1,6 +1,21 @@
 import { OpenAIAdapter } from '../openai/adapter.js';
-import type { ApiKeyAuth, ClientOptions } from '../../types.js';
+import { streamFromOpenAI } from '../openai/_streaming.js';
+import type { ApiKeyAuth, ClientOptions, LlmEvent, PromptRequest } from '../../types.js';
+import { makeMetadataExtractor } from '../_metadata.js';
 import { huggingfaceManifest } from './manifest.js';
+
+/**
+ * HuggingFace Inference Providers response-header diagnostics.
+ *
+ * `x-inference-provider` is the killer signal — names the actual
+ * backend (Groq, Cerebras, Together, Fireworks, etc.) that served
+ * the request. Useful for diagnosing latency anomalies and confirming
+ * provider routing for `:fastest` / `:provider-name` model suffixes.
+ */
+const HUGGINGFACE_METADATA_EXTRACTOR = makeMetadataExtractor([
+  { header: 'x-inference-provider', key: 'provider' },
+  { header: 'x-request-id', key: 'request_id' },
+]);
 
 /**
  * Adapter for HuggingFace Inference Providers.
@@ -31,5 +46,12 @@ export class HuggingfaceAdapter extends OpenAIAdapter {
       },
       client,
     );
+  }
+
+  override stream(req: PromptRequest): AsyncIterable<LlmEvent> {
+    return streamFromOpenAI(this.ensureClient(), req, {
+      knownModels: huggingfaceManifest.knownModels,
+      vendorMetadataExtractor: HUGGINGFACE_METADATA_EXTRACTOR,
+    });
   }
 }

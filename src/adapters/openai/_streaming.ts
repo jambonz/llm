@@ -51,6 +51,22 @@ export async function* streamFromOpenAI(
      *     `'max_tokens'` to pin the legacy name.
      */
     tokensParam?: 'max_tokens' | 'max_completion_tokens';
+    /**
+     * Optional adapter-supplied extractor that pulls vendor-specific
+     * diagnostic data off the upstream HTTP response headers (request
+     * id, rate-limit remaining, routing info, etc.) and returns it as
+     * a flat key/value record.
+     *
+     * Called once per stream after the underlying `Response` is
+     * available (via the OpenAI SDK's `.withResponse()` pattern). The
+     * returned record is attached to the `end` event as
+     * `vendorMetadata` if non-empty. Each adapter declares its own
+     * allowlist — see the `huggingface`, `azure-openai`, `groq` etc.
+     * adapters for examples.
+     */
+    vendorMetadataExtractor?: (
+      headers: Headers,
+    ) => Record<string, string | number>;
   },
 ): AsyncIterable<LlmEvent> {
   assertValidRequest(req);
@@ -88,8 +104,28 @@ export async function* streamFromOpenAI(
   }
 
   let stream;
+  let responseHeaders: Headers | undefined;
   try {
-    stream = await client.chat.completions.create(body, { signal: req.signal });
+    // Production: `.withResponse()` on the OpenAI SDK's APIPromise surfaces
+    // the underlying HTTP `Response` so adapters that supply a
+    // `vendorMetadataExtractor` can read response headers. Test mocks
+    // typically return the stream directly (no APIPromise wrapper); fall
+    // through to a plain await when `.withResponse` isn't present, so
+    // existing test infrastructure keeps working unchanged.
+    const apiPromise = client.chat.completions.create(body, { signal: req.signal });
+    const maybeWithResponse = (apiPromise as unknown as {
+      withResponse?: () => Promise<{
+        data: Awaited<typeof apiPromise>;
+        response: { headers?: Headers };
+      }>;
+    }).withResponse;
+    if (typeof maybeWithResponse === 'function') {
+      const result = await maybeWithResponse.call(apiPromise);
+      stream = result.data;
+      responseHeaders = result.response?.headers;
+    } else {
+      stream = await apiPromise;
+    }
   } catch (err) {
     if (isAbortError(err)) {
       yield { type: 'end', finishReason: 'aborted' };
@@ -200,6 +236,14 @@ export async function* streamFromOpenAI(
     ...(usage ? { usage } : {}),
     ...(finalRawReason ? { rawReason: finalRawReason } : {}),
   };
+
+  if (options.vendorMetadataExtractor && responseHeaders) {
+    const metadata = options.vendorMetadataExtractor(responseHeaders);
+    if (metadata && Object.keys(metadata).length > 0) {
+      endEvent.vendorMetadata = metadata;
+    }
+  }
+
   yield endEvent;
 }
 

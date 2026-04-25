@@ -204,4 +204,51 @@ describe('AzureOpenAIAdapter — wire', () => {
     expect(body.max_completion_tokens).toBe(128);
     expect(body.max_tokens).toBeUndefined();
   });
+
+  it('extracts region, deployment, and request_id headers into vendorMetadata', async () => {
+    const streamObj = {
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+      },
+    };
+    const fakeApiPromise = {
+      withResponse: async () => ({
+        data: streamObj,
+        response: {
+          headers: new Headers({
+            'x-ms-region': 'East US',
+            'x-ms-deployment-name': 'gpt-5.4-mini',
+            'apim-request-id': 'azure-req-abc',
+            'azureml-model-session': 'd20260410065636-4727ffaa',
+            'x-ratelimit-remaining-requests': '149',
+            'x-ratelimit-remaining-tokens': '149993',
+          }),
+        },
+      }),
+      then: (onFulfilled: (s: typeof streamObj) => unknown) =>
+        Promise.resolve(streamObj).then(onFulfilled),
+    };
+    mocks.create.mockReturnValueOnce(fakeApiPromise);
+
+    const llm = await createLlm({ vendor: 'azure-openai', auth: validAuth });
+    const events = [];
+    for await (const e of llm.stream({
+      model: 'gpt-5.4-mini',
+      messages: [{ role: 'user', content: 'hi' }],
+    })) {
+      events.push(e);
+    }
+    const end = events.find((e) => e.type === 'end') as Extract<
+      (typeof events)[number],
+      { type: 'end' }
+    >;
+    expect(end.vendorMetadata).toEqual({
+      region: 'East US',
+      deployment: 'gpt-5.4-mini',
+      request_id: 'azure-req-abc',
+      model_session: 'd20260410065636-4727ffaa',
+      requests_remaining: 149,
+      tokens_remaining: 149993,
+    });
+  });
 });

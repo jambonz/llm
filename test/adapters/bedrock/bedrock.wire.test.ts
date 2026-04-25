@@ -469,4 +469,38 @@ describe('Bedrock adapter — wire', () => {
     expect(models.some((m) => m.id.startsWith('anthropic.claude'))).toBe(true);
     expect(bedrockMock.commandCalls(ConverseStreamCommand)).toHaveLength(0);
   });
+
+  // -----------------------------------------------------------------------
+  // vendorMetadata extraction from response headers
+  // -----------------------------------------------------------------------
+
+  it('extracts invocation_latency, cache token counts, and trace_id into vendorMetadata', async () => {
+    bedrockMock.on(ConverseStreamCommand).resolvesOnce({
+      stream: mockStream([{ messageStop: { stopReason: 'end_turn' } }]) as never,
+      $metadata: {
+        // AWS-SDK style header bag (record, lowercased keys).
+        httpHeaders: {
+          'x-amzn-bedrock-invocation-latency': '438',
+          'x-amzn-bedrock-cache-read-input-token-count': '1024',
+          'x-amzn-bedrock-cache-write-input-token-count': '256',
+          'x-amzn-bedrock-trace-id': 'bedrock-trace-xyz',
+        },
+      } as never,
+    });
+    const adapter = await buildAdapter();
+    const events = await drain(adapter, {
+      model: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    const end = events.find((e) => e.type === 'end') as Extract<
+      LlmEvent,
+      { type: 'end' }
+    >;
+    expect(end.vendorMetadata).toEqual({
+      invocation_latency_ms: 438,
+      cache_read_input_tokens: 1024,
+      cache_write_input_tokens: 256,
+      trace_id: 'bedrock-trace-xyz',
+    });
+  });
 });

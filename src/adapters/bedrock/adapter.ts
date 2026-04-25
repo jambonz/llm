@@ -20,6 +20,7 @@ import type {
   ToolCallEvent,
 } from '../../types.js';
 import { assertValidRequest } from '../../validate.js';
+import { extractMetadata } from '../_metadata.js';
 import { bedrockManifest } from './manifest.js';
 
 type BedrockAuthSpec = BedrockApiKeyAuth | BedrockIamAuth;
@@ -240,6 +241,32 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
       ...(usage ? { usage } : {}),
       ...(stopReason ? { rawReason: stopReason } : {}),
     };
+
+    // Bedrock-specific response-header diagnostics. AWS surfaces them on
+    // `response.$metadata.httpHeaders` rather than a standards-compliant
+    // `Headers` instance — and the AWS SDK's TypeScript types don't include
+    // the field, so cast through unknown. Useful signals:
+    // `x-amzn-bedrock-invocation-latency` (vendor-side latency),
+    // `x-amzn-bedrock-cache-{read,write}-input-token-count` (prompt-cache
+    // effectiveness), `x-amzn-bedrock-trace-id` (support tickets).
+    const httpHeaders = (response.$metadata as unknown as
+      | { httpHeaders?: Record<string, string> }
+      | undefined)?.httpHeaders;
+    if (httpHeaders) {
+      const metadata = extractMetadata(
+        [
+          { header: 'x-amzn-bedrock-invocation-latency', key: 'invocation_latency_ms', numeric: true },
+          { header: 'x-amzn-bedrock-cache-read-input-token-count', key: 'cache_read_input_tokens', numeric: true },
+          { header: 'x-amzn-bedrock-cache-write-input-token-count', key: 'cache_write_input_tokens', numeric: true },
+          { header: 'x-amzn-bedrock-trace-id', key: 'trace_id' },
+        ],
+        httpHeaders,
+      );
+      if (Object.keys(metadata).length > 0) {
+        endEvent.vendorMetadata = metadata;
+      }
+    }
+
     yield endEvent;
   }
 
