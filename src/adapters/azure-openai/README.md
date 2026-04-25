@@ -22,7 +22,7 @@ The `AzureOpenAI` class exported by the `openai` SDK handles all four quirks in 
 | `apiKey` | `abc123…` | Resource key from the Azure portal → OpenAI resource → Keys and Endpoint. |
 | `endpoint` | `https://my-resource.openai.azure.com` | Resource endpoint, no trailing slash. |
 | `deployment` | `prod-gpt-4o` | The name the user chose in Azure AI Studio — **not** the model id. |
-| `apiVersion` | `2024-10-21` | Data-plane api-version. Microsoft rolls these frequently; pin explicitly. |
+| `apiVersion` | `2025-03-01-preview` | Data-plane api-version. Microsoft rolls these frequently; pin explicitly. gpt-5 / o-series deployments require `2025-03-01-preview` or later because Azure routes them through the Responses API under the hood. |
 
 Microsoft Entra (AAD) / managed-identity auth is out of scope for v1. The `AzureOpenAI` SDK class supports it via `azureADTokenProvider`, so a future `kind: 'azureOpenAIAad'` can be added as an additional `authKind` without breaking changes.
 
@@ -34,7 +34,7 @@ The adapter's `knownModels` list is keyed by underlying model (e.g. `gpt-4o`, `g
 
 ## `apiVersion` is a user field on purpose
 
-Microsoft ships new `api-version` strings on a rolling monthly cadence. Customers who pin to an older version for reproducibility should not have to wait for a library release to move forward. The manifest ships `default: '2024-10-21'` (current stable GA at the time of writing); users are free to override.
+Microsoft ships new `api-version` strings on a rolling monthly cadence. Customers who pin to an older version for reproducibility should not have to wait for a library release to move forward. The manifest ships `default: '2025-03-01-preview'` — the oldest version that works with gpt-5 / o-series deployments (Azure routes them through the Responses API which requires that api-version or later, even though we call `/chat/completions`). Users are free to override with a newer version if their deployment needs one.
 
 ## testCredential
 

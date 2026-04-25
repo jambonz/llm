@@ -33,7 +33,7 @@ export interface RawCredential {
   endpoint?: string | null;
   /** Azure OpenAI deployment name (the user-created deployment, not the model id). */
   deployment?: string | null;
-  /** Azure OpenAI data-plane api-version, e.g. `2024-10-21`. */
+  /** Azure OpenAI data-plane api-version, e.g. `2025-03-01-preview`. */
   api_version?: string | null;
 }
 
