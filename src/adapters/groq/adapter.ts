@@ -7,12 +7,17 @@ import { groqManifest } from './manifest.js';
 /**
  * Groq response-header diagnostics. `x-groq-region` names the Groq
  * datacenter that served the request — useful for latency analysis.
- * Rate-limit headers help operators spot when a workload is trending
- * toward exhaustion across turns within a call.
+ * `openai-processing-ms` is forwarded by Groq (they're OpenAI-wire-
+ * compatible) and reports their server-side processing time, which
+ * can be compared against wall-clock to spot infrastructure queueing
+ * not counted in the model-server timer. Rate-limit headers help
+ * operators spot when a workload is trending toward exhaustion
+ * across turns within a call.
  */
 const GROQ_METADATA_EXTRACTOR = makeMetadataExtractor([
   { header: 'x-request-id', key: 'request_id' },
   { header: 'x-groq-region', key: 'region' },
+  { header: 'openai-processing-ms', key: 'processing_ms', numeric: true },
   { header: 'x-ratelimit-remaining-requests', key: 'requests_remaining', numeric: true },
   { header: 'x-ratelimit-remaining-tokens', key: 'tokens_remaining', numeric: true },
 ]);

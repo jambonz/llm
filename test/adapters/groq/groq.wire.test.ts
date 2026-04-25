@@ -84,4 +84,53 @@ describe('GroqAdapter — wire', () => {
     });
     expect(llm.vendor).toBe('groq');
   });
+
+  it('extracts request_id, region, processing_ms, and ratelimit headers into vendorMetadata', async () => {
+    const streamObj = {
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ index: 0, delta: { content: 'hi' }, finish_reason: null }] };
+        yield { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+      },
+    };
+    const fakeApiPromise = {
+      withResponse: async () => ({
+        data: streamObj,
+        response: {
+          headers: new Headers({
+            'x-request-id': 'req_01abc',
+            'x-groq-region': 'msp',
+            'openai-processing-ms': '87',
+            'x-ratelimit-remaining-requests': '999',
+            'x-ratelimit-remaining-tokens': '11803',
+          }),
+        },
+      }),
+      then: (onFulfilled: (s: typeof streamObj) => unknown) =>
+        Promise.resolve(streamObj).then(onFulfilled),
+    };
+    mocks.create.mockReturnValueOnce(fakeApiPromise);
+
+    const llm = await createLlm({
+      vendor: 'groq',
+      auth: { kind: 'apiKey', apiKey: 'gsk-test' },
+    });
+    const events = [];
+    for await (const e of llm.stream({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: 'hi' }],
+    })) {
+      events.push(e);
+    }
+    const end = events.find((e) => e.type === 'end') as Extract<
+      typeof events[number],
+      { type: 'end' }
+    >;
+    expect(end.vendorMetadata).toEqual({
+      request_id: 'req_01abc',
+      region: 'msp',
+      processing_ms: 87,
+      requests_remaining: 999,
+      tokens_remaining: 11803,
+    });
+  });
 });
