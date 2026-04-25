@@ -115,7 +115,16 @@ export class AzureOpenAIAdapter implements LlmAdapter<AzureOpenAIApiKeyAuth> {
       // The newer name is a superset — also accepted by gpt-4o, gpt-4-turbo,
       // and gpt-3.5-turbo deployments — so it's the safe choice for a probe
       // that has to work regardless of the underlying deployment model.
-      max_completion_tokens: 1,
+      //
+      // 256 (not 1): reasoning models consume reasoning tokens BEFORE
+      // visible output, all counted against this cap. With 1 the model
+      // can't produce any output and Azure returns
+      // `400 Could not finish the message because max_tokens or model
+      // output limit was reached`. 256 is comfortable headroom for
+      // reasoning + a "pong"-sized reply on every model we ship in the
+      // manifest, while still bounded so the probe can't run away on a
+      // misconfigured deployment.
+      max_completion_tokens: 256,
       stream: false,
     } as Parameters<typeof client.chat.completions.create>[0]);
   }

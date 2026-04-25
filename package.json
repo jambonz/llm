@@ -1,6 +1,6 @@
 {
   "name": "@jambonz/llm",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Voice-oriented LLM adapter library — a uniform interface for streaming chat completions from multiple LLM vendors, with first-class support for tool calls, AbortSignal interruption, and lossless history round-tripping.",
   "type": "module",
   "main": "./dist/index.cjs",

@@ -125,8 +125,12 @@ describe('AzureOpenAIAdapter — wire', () => {
     const [body] = mocks.create.mock.calls[0]!;
     // gpt-5 family and o-series reasoning models reject `max_tokens`; the
     // probe uses the newer `max_completion_tokens` which is a superset
-    // accepted by all current Azure deployments.
-    expect(body.max_completion_tokens).toBe(1);
+    // accepted by all current Azure deployments. The cap is generous (256)
+    // so reasoning models have room for their internal reasoning tokens
+    // plus a tiny visible reply — a smaller cap (we shipped with 1 in
+    // 0.4.1) caused Azure to return 400 because reasoning consumed the
+    // entire budget before any output could be produced.
+    expect(body.max_completion_tokens).toBe(256);
     expect(body.max_tokens).toBeUndefined();
     expect(body.stream).toBe(false);
     expect(body.messages).toEqual([{ role: 'user', content: 'ping' }]);
