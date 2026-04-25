@@ -103,6 +103,15 @@ export async function* streamFromOpenAI(
     (body as unknown as Record<string, unknown>)[param] = effectiveMaxTokens;
   }
 
+  // hrtime markers for client-side timing breakdown attached to the end event:
+  //   t0 = before SDK call
+  //   t1 = response headers received (after withResponse resolves)
+  //   t2 = first content token yielded back to caller
+  // `clientTiming` is omitted when t1 was never reached (error before headers).
+  const t0 = process.hrtime.bigint();
+  let t1: bigint | undefined;
+  let t2: bigint | undefined;
+
   let stream;
   let responseHeaders: Headers | undefined;
   try {
@@ -126,6 +135,7 @@ export async function* streamFromOpenAI(
     } else {
       stream = await apiPromise;
     }
+    t1 = process.hrtime.bigint();
   } catch (err) {
     if (isAbortError(err)) {
       yield { type: 'end', finishReason: 'aborted' };
@@ -169,6 +179,7 @@ export async function* streamFromOpenAI(
       const finishReason = choice.finish_reason;
 
       if (delta?.content) {
+        if (t2 === undefined) t2 = process.hrtime.bigint();
         yield { type: 'token', text: delta.content };
       }
 
@@ -242,6 +253,17 @@ export async function* streamFromOpenAI(
     if (metadata && Object.keys(metadata).length > 0) {
       endEvent.vendorMetadata = metadata;
     }
+  }
+
+  if (t1 !== undefined) {
+    const t3 = process.hrtime.bigint();
+    endEvent.clientTiming = {
+      requestToHeadersMs: Number(t1 - t0) / 1e6,
+      ...(t2 !== undefined
+        ? { headersToFirstTokenMs: Number(t2 - t1) / 1e6 }
+        : {}),
+      totalMs: Number(t3 - t0) / 1e6,
+    };
   }
 
   yield endEvent;
