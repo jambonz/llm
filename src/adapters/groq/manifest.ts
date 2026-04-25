@@ -59,7 +59,7 @@ export const groqManifest: AdapterManifest = {
           label: 'API Key',
           type: 'password',
           required: true,
-          help: 'Get an API key from https://console.groq.com/keys.',
+          help: 'Get an API key from https://console.groq.com/keys (sign in first if needed)',
         },
         {
           name: 'baseURL',

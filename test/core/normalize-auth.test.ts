@@ -36,6 +36,29 @@ describe('normalizeAuth', () => {
     });
   });
 
+  describe('groq', () => {
+    it('maps api_key to ApiKeyAuth (no forced baseURL — adapter defaults it)', () => {
+      expect(normalizeAuth('groq', { api_key: 'gsk' })).toEqual({
+        kind: 'apiKey',
+        apiKey: 'gsk',
+      });
+    });
+
+    it('passes through caller-supplied api_url (for proxy use)', () => {
+      expect(
+        normalizeAuth('groq', { api_key: 'gsk', api_url: 'https://my-proxy/v1' }),
+      ).toEqual({
+        kind: 'apiKey',
+        apiKey: 'gsk',
+        baseURL: 'https://my-proxy/v1',
+      });
+    });
+
+    it('throws when api_key is missing', () => {
+      expect(() => normalizeAuth('groq', {})).toThrowError(/requires 'api_key'/);
+    });
+  });
+
   describe('deepseek', () => {
     it('defaults baseURL to deepseek hosted endpoint', () => {
       expect(normalizeAuth('deepseek', { api_key: 'sk' })).toEqual({
