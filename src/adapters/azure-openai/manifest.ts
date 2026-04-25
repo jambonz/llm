@@ -126,11 +126,13 @@ export const azureOpenAIManifest: AdapterManifest = {
           label: 'API Version',
           type: 'text',
           required: true,
-          default: '2024-10-21',
+          default: '2025-03-01-preview',
           help:
-            'Data-plane api-version, e.g. 2024-10-21. Microsoft rolls these ' +
-            'frequently; see Azure OpenAI API reference docs for the current ' +
-            'stable GA version.',
+            'Data-plane api-version, e.g. 2025-03-01-preview. Microsoft rolls ' +
+            'these frequently; newer gpt-5 / o-series deployments require ' +
+            'an api-version that supports the Responses API (2025-03-01-preview ' +
+            'or later). See Azure OpenAI API reference docs for the current ' +
+            'recommended version.',
         },
       ],
     },

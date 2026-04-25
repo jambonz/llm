@@ -141,7 +141,7 @@ export interface AzureOpenAIApiKeyAuth {
   endpoint: string;
   /** Deployment name the user created in Azure AI Studio / Azure OpenAI Studio. */
   deployment: string;
-  /** Azure OpenAI data-plane api-version, e.g. `2024-10-21`. */
+  /** Azure OpenAI data-plane api-version, e.g. `2025-03-01-preview`. */
   apiVersion: string;
 }
 
