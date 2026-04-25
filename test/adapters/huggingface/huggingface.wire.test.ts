@@ -101,4 +101,83 @@ describe('HuggingfaceAdapter — wire', () => {
       baseURL: 'https://my-proxy/v1',
     });
   });
+
+  it('end event carries vendorMetadata with x-inference-provider when present', async () => {
+    // Mock the SDK's APIPromise pattern: create returns an object that has
+    // both `.withResponse()` AND is awaitable to the stream directly.
+    const streamObj = {
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ index: 0, delta: { content: 'hi' }, finish_reason: null }] };
+        yield { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+      },
+    };
+    const fakeApiPromise = {
+      withResponse: async () => ({
+        data: streamObj,
+        response: {
+          headers: new Headers({
+            'x-inference-provider': 'groq',
+            'x-request-id': 'req-abc-123',
+          }),
+        },
+      }),
+      then: (onFulfilled: (s: typeof streamObj) => unknown) => Promise.resolve(streamObj).then(onFulfilled),
+    };
+    mocks.create.mockReturnValueOnce(fakeApiPromise);
+
+    const llm = await createLlm({
+      vendor: 'huggingface',
+      auth: { kind: 'apiKey', apiKey: 'hf_test' },
+    });
+    const events = [];
+    for await (const e of llm.stream({
+      model: 'meta-llama/Llama-3.3-70B-Instruct',
+      messages: [{ role: 'user', content: 'hi' }],
+    })) {
+      events.push(e);
+    }
+    const end = events.find((e) => e.type === 'end') as Extract<
+      (typeof events)[number],
+      { type: 'end' }
+    >;
+    expect(end.vendorMetadata).toEqual({
+      provider: 'groq',
+      request_id: 'req-abc-123',
+    });
+  });
+
+  it('end event omits vendorMetadata when no allowlisted headers are present', async () => {
+    const streamObj = {
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+      },
+    };
+    const fakeApiPromise = {
+      withResponse: async () => ({
+        data: streamObj,
+        response: {
+          headers: new Headers({ 'content-type': 'application/json' }),
+        },
+      }),
+      then: (onFulfilled: (s: typeof streamObj) => unknown) => Promise.resolve(streamObj).then(onFulfilled),
+    };
+    mocks.create.mockReturnValueOnce(fakeApiPromise);
+
+    const llm = await createLlm({
+      vendor: 'huggingface',
+      auth: { kind: 'apiKey', apiKey: 'hf_test' },
+    });
+    const events = [];
+    for await (const e of llm.stream({
+      model: 'meta-llama/Llama-3.3-70B-Instruct',
+      messages: [{ role: 'user', content: 'hi' }],
+    })) {
+      events.push(e);
+    }
+    const end = events.find((e) => e.type === 'end') as Extract<
+      (typeof events)[number],
+      { type: 'end' }
+    >;
+    expect(end.vendorMetadata).toBeUndefined();
+  });
 });

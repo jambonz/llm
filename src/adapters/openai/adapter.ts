@@ -15,7 +15,22 @@ import {
   listOpenAICompatibleModels,
   streamFromOpenAI,
 } from './_streaming.js';
+import { makeMetadataExtractor } from '../_metadata.js';
 import { openAIManifest } from './manifest.js';
+
+/**
+ * OpenAI response-header diagnostics surfaced as `vendorMetadata` on the
+ * `end` event. `request_id` is essential for support tickets;
+ * `processing_ms` separates vendor inference time from network time;
+ * the rate-limit headers help operators spot when an account is trending
+ * toward exhaustion within a single call.
+ */
+const OPENAI_METADATA_EXTRACTOR = makeMetadataExtractor([
+  { header: 'x-request-id', key: 'request_id' },
+  { header: 'openai-processing-ms', key: 'processing_ms', numeric: true },
+  { header: 'x-ratelimit-remaining-requests', key: 'requests_remaining', numeric: true },
+  { header: 'x-ratelimit-remaining-tokens', key: 'tokens_remaining', numeric: true },
+]);
 
 /**
  * Adapter for OpenAI (and OpenAI-compatible endpoints: DeepSeek, LM Studio,
@@ -47,6 +62,7 @@ export class OpenAIAdapter implements LlmAdapter<ApiKeyAuth> {
   stream(req: PromptRequest): AsyncIterable<LlmEvent> {
     return streamFromOpenAI(this.ensureClient(), req, {
       knownModels: openAIManifest.knownModels,
+      vendorMetadataExtractor: OPENAI_METADATA_EXTRACTOR,
     });
   }
 

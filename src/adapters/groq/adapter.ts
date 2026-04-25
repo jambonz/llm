@@ -1,6 +1,21 @@
 import { OpenAIAdapter } from '../openai/adapter.js';
-import type { ApiKeyAuth, ClientOptions } from '../../types.js';
+import { streamFromOpenAI } from '../openai/_streaming.js';
+import type { ApiKeyAuth, ClientOptions, LlmEvent, PromptRequest } from '../../types.js';
+import { makeMetadataExtractor } from '../_metadata.js';
 import { groqManifest } from './manifest.js';
+
+/**
+ * Groq response-header diagnostics. `x-groq-region` names the Groq
+ * datacenter that served the request — useful for latency analysis.
+ * Rate-limit headers help operators spot when a workload is trending
+ * toward exhaustion across turns within a call.
+ */
+const GROQ_METADATA_EXTRACTOR = makeMetadataExtractor([
+  { header: 'x-request-id', key: 'request_id' },
+  { header: 'x-groq-region', key: 'region' },
+  { header: 'x-ratelimit-remaining-requests', key: 'requests_remaining', numeric: true },
+  { header: 'x-ratelimit-remaining-tokens', key: 'tokens_remaining', numeric: true },
+]);
 
 /**
  * Adapter for Groq.
@@ -28,5 +43,14 @@ export class GroqAdapter extends OpenAIAdapter {
       },
       client,
     );
+  }
+
+  override stream(req: PromptRequest): AsyncIterable<LlmEvent> {
+    // Override so we can pass Groq's own metadata extractor; otherwise
+    // we'd inherit OpenAI's, which misses `x-groq-region`.
+    return streamFromOpenAI(this.ensureClient(), req, {
+      knownModels: groqManifest.knownModels,
+      vendorMetadataExtractor: GROQ_METADATA_EXTRACTOR,
+    });
   }
 }

@@ -14,7 +14,28 @@ import {
   appendOpenAIToolResult,
   streamFromOpenAI,
 } from '../openai/_streaming.js';
+import { makeMetadataExtractor } from '../_metadata.js';
 import { azureOpenAIManifest } from './manifest.js';
+
+/**
+ * Azure OpenAI response-header diagnostics.
+ *
+ * `x-ms-region` confirms which datacenter served (operators sometimes
+ * provision multi-region deployments and want to verify routing).
+ * `x-ms-deployment-name` confirms the deployment that served — useful
+ * because Azure deployment names are arbitrary user strings and a
+ * misconfigured credential could be pointed at a different deployment
+ * than expected. `apim-request-id` is for support tickets;
+ * `azureml-model-session` is the underlying model session id.
+ */
+const AZURE_OPENAI_METADATA_EXTRACTOR = makeMetadataExtractor([
+  { header: 'x-ms-region', key: 'region' },
+  { header: 'x-ms-deployment-name', key: 'deployment' },
+  { header: 'apim-request-id', key: 'request_id' },
+  { header: 'azureml-model-session', key: 'model_session' },
+  { header: 'x-ratelimit-remaining-requests', key: 'requests_remaining', numeric: true },
+  { header: 'x-ratelimit-remaining-tokens', key: 'tokens_remaining', numeric: true },
+]);
 
 /**
  * Adapter for Azure OpenAI Service.
@@ -77,6 +98,7 @@ export class AzureOpenAIAdapter implements LlmAdapter<AzureOpenAIApiKeyAuth> {
     return streamFromOpenAI(this.ensureClient(), req, {
       knownModels: azureOpenAIManifest.knownModels,
       tokensParam: 'max_completion_tokens',
+      vendorMetadataExtractor: AZURE_OPENAI_METADATA_EXTRACTOR,
     });
   }
 

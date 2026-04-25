@@ -15,7 +15,17 @@ import {
   appendOpenAIToolResult,
   streamFromOpenAI,
 } from '../openai/_streaming.js';
+import { makeMetadataExtractor } from '../_metadata.js';
 import { vertexOpenAIManifest } from './manifest.js';
+
+/**
+ * Vertex partner-model response-header diagnostics. Sparse —
+ * Google's compat layer mostly returns standard request id and
+ * little else useful for client-side observability.
+ */
+const VERTEX_OPENAI_METADATA_EXTRACTOR = makeMetadataExtractor([
+  { header: 'x-request-id', key: 'request_id' },
+]);
 
 /**
  * Adapter for third-party models on Vertex AI (Mistral, Llama, etc.) that
@@ -92,6 +102,7 @@ export class VertexOpenAIAdapter implements LlmAdapter<VertexServiceAccountAuth>
       // The model-id heuristic wouldn't catch a partner model named in the
       // OpenAI style (unlikely today, but defensive).
       tokensParam: 'max_tokens',
+      vendorMetadataExtractor: VERTEX_OPENAI_METADATA_EXTRACTOR,
     });
   }
 

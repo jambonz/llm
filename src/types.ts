@@ -83,7 +83,25 @@ export type LlmEvent =
   | { type: 'token'; text: string }
   | { type: 'toolCallStart'; id: string; name: string }
   | { type: 'toolCall'; id: string; name: string; arguments: unknown }
-  | { type: 'end'; finishReason: FinishReason; usage?: Usage; rawReason?: string };
+  | {
+      type: 'end';
+      finishReason: FinishReason;
+      usage?: Usage;
+      rawReason?: string;
+      /**
+       * Optional vendor-specific diagnostic data captured from response
+       * headers — request id, rate-limit remaining, routing/region, vendor
+       * processing time, cache token counts, etc. Each adapter contributes
+       * an allowlisted subset; never present unless the adapter populated it.
+       *
+       * Shape is `Record<string, string | number>` so consumers can render
+       * it as a key/value table without per-vendor knowledge. The webapp
+       * surfaces this on the per-turn detail view; feature-server forwards
+       * it on the agent verb's `turn_end` eventHook payload as
+       * `vendor_metadata`.
+       */
+      vendorMetadata?: Record<string, string | number>;
+    };
 
 /** Convenience alias for the fully-accumulated tool-call event shape. */
 export type ToolCallEvent = Extract<LlmEvent, { type: 'toolCall' }>;

@@ -427,4 +427,48 @@ describe('OpenAI adapter — wire format', () => {
     expect(body.max_tokens).toBeUndefined();
     expect(body.max_completion_tokens).toBeUndefined();
   });
+
+  // ---------------------------------------------------------------------------
+  // vendorMetadata extraction from response headers
+  // ---------------------------------------------------------------------------
+
+  it('extracts request_id, processing_ms, and ratelimit headers into vendorMetadata', async () => {
+    const streamObj = {
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+      },
+    };
+    const fakeApiPromise = {
+      withResponse: async () => ({
+        data: streamObj,
+        response: {
+          headers: new Headers({
+            'x-request-id': 'req-openai-xyz',
+            'openai-processing-ms': '342',
+            'x-ratelimit-remaining-requests': '4995',
+            'x-ratelimit-remaining-tokens': '999500',
+          }),
+        },
+      }),
+      then: (onFulfilled: (s: typeof streamObj) => unknown) =>
+        Promise.resolve(streamObj).then(onFulfilled),
+    };
+    mocks.create.mockReturnValueOnce(fakeApiPromise);
+
+    const adapter = await buildAdapter();
+    const events = await drain(adapter, {
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    const end = events.find((e) => e.type === 'end') as Extract<
+      LlmEvent,
+      { type: 'end' }
+    >;
+    expect(end.vendorMetadata).toEqual({
+      request_id: 'req-openai-xyz',
+      processing_ms: 342,
+      requests_remaining: 4995,
+      tokens_remaining: 999500,
+    });
+  });
 });

@@ -389,4 +389,54 @@ describe('Anthropic adapter — wire format', () => {
     const future = models.find((m) => m.id === 'claude-future-9000');
     expect(future?.capabilities.tools).toBe(true); // default for Claude
   });
+
+  // -----------------------------------------------------------------------
+  // vendorMetadata extraction from response headers
+  // -----------------------------------------------------------------------
+
+  it('extracts request-id and ratelimit headers into vendorMetadata', async () => {
+    const streamObj = {
+      async *[Symbol.asyncIterator]() {
+        yield { type: 'message_start', message: { usage: { input_tokens: 10 } } };
+        yield {
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn' },
+          usage: { output_tokens: 5 },
+        };
+        yield { type: 'message_stop' };
+      },
+    };
+    const fakeApiPromise = {
+      withResponse: async () => ({
+        data: streamObj,
+        response: {
+          headers: new Headers({
+            'request-id': 'req_anthropic_xyz',
+            'anthropic-ratelimit-requests-remaining': '49',
+            'anthropic-ratelimit-input-tokens-remaining': '99000',
+            'anthropic-ratelimit-output-tokens-remaining': '24500',
+          }),
+        },
+      }),
+      then: (onFulfilled: (s: typeof streamObj) => unknown) =>
+        Promise.resolve(streamObj).then(onFulfilled),
+    };
+    mocks.create.mockReturnValueOnce(fakeApiPromise);
+
+    const adapter = await buildAdapter();
+    const events = await drain(adapter, {
+      model: 'claude-haiku-4-5-20251001',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    const end = events.find((e) => e.type === 'end') as Extract<
+      LlmEvent,
+      { type: 'end' }
+    >;
+    expect(end.vendorMetadata).toEqual({
+      request_id: 'req_anthropic_xyz',
+      requests_remaining: 49,
+      input_tokens_remaining: 99000,
+      output_tokens_remaining: 24500,
+    });
+  });
 });
