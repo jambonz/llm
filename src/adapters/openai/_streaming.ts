@@ -37,6 +37,20 @@ export async function* streamFromOpenAI(
      * which defaults correctly on its own.
      */
     defaultMaxTokens?: number;
+    /**
+     * Which wire parameter to use for the max-output cap. Defaults to a
+     * per-request heuristic on `req.model` (see {@link needsMaxCompletionTokens}):
+     * OpenAI's o-series reasoning models and gpt-5 family require
+     * `max_completion_tokens`; everything else uses legacy `max_tokens`.
+     *
+     * Override when:
+     *   - The model id doesn't reflect the underlying model (Azure OpenAI
+     *     deployment names are arbitrary) — pass `'max_completion_tokens'`.
+     *   - Talking to an older OpenAI-compat endpoint that only knows
+     *     `max_tokens` (Vertex Llama MaaS, some local servers) — pass
+     *     `'max_tokens'` to pin the legacy name.
+     */
+    tokensParam?: 'max_tokens' | 'max_completion_tokens';
   },
 ): AsyncIterable<LlmEvent> {
   assertValidRequest(req);
@@ -66,7 +80,12 @@ export async function* streamFromOpenAI(
   }
   if (req.temperature !== undefined) body.temperature = req.temperature;
   const effectiveMaxTokens = req.maxTokens ?? options.defaultMaxTokens;
-  if (effectiveMaxTokens !== undefined) body.max_tokens = effectiveMaxTokens;
+  if (effectiveMaxTokens !== undefined) {
+    const param =
+      options.tokensParam ??
+      (needsMaxCompletionTokens(req.model) ? 'max_completion_tokens' : 'max_tokens');
+    (body as unknown as Record<string, unknown>)[param] = effectiveMaxTokens;
+  }
 
   let stream;
   try {
@@ -300,6 +319,19 @@ function capabilitiesFor(
   const known = knownModels.find((k) => k.id === modelId);
   if (known) return known.capabilities;
   return defaultCapabilitiesForUnknown(modelId);
+}
+
+/**
+ * Does this model id require `max_completion_tokens` instead of legacy
+ * `max_tokens`? OpenAI's reasoning family (o1, o3, o4) and gpt-5 dropped
+ * `max_tokens` and return a 400 `Unsupported parameter` when it's sent.
+ * Older chat models (gpt-4, gpt-4o, gpt-3.5-turbo) still accept `max_tokens`,
+ * so we only switch when the model id matches the newer prefixes.
+ *
+ * Exposed so adapter authors (and tests) can rely on the same heuristic.
+ */
+export function needsMaxCompletionTokens(modelId: string): boolean {
+  return /^(o\d|gpt-5)/i.test(modelId);
 }
 
 export function defaultCapabilitiesForUnknown(modelId: string): ModelCapabilities {

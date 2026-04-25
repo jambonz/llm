@@ -123,7 +123,11 @@ describe('AzureOpenAIAdapter — wire', () => {
     await llm.testCredential();
     expect(mocks.create).toHaveBeenCalledOnce();
     const [body] = mocks.create.mock.calls[0]!;
-    expect(body.max_tokens).toBe(1);
+    // gpt-5 family and o-series reasoning models reject `max_tokens`; the
+    // probe uses the newer `max_completion_tokens` which is a superset
+    // accepted by all current Azure deployments.
+    expect(body.max_completion_tokens).toBe(1);
+    expect(body.max_tokens).toBeUndefined();
     expect(body.stream).toBe(false);
     expect(body.messages).toEqual([{ role: 'user', content: 'ping' }]);
   });
@@ -171,5 +175,29 @@ describe('AzureOpenAIAdapter — wire', () => {
         // api_version missing
       }),
     ).toThrowError(/api_version/);
+  });
+
+  it('stream() forwards maxTokens as max_completion_tokens (gpt-5 / o-series compatibility)', async () => {
+    mocks.create.mockResolvedValueOnce({
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+      },
+    });
+    const llm = await createLlm({ vendor: 'azure-openai', auth: validAuth });
+    const events = [];
+    for await (const e of llm.stream({
+      model: 'prod-gpt-4o',
+      messages: [{ role: 'user', content: 'hi' }],
+      maxTokens: 128,
+    })) {
+      events.push(e);
+    }
+    expect(mocks.create).toHaveBeenCalledOnce();
+    const [body] = mocks.create.mock.calls[0]!;
+    // Azure deployment names are arbitrary; the adapter pins
+    // max_completion_tokens so gpt-5 / o-series deployments work regardless
+    // of what the user named them.
+    expect(body.max_completion_tokens).toBe(128);
+    expect(body.max_tokens).toBeUndefined();
   });
 });
