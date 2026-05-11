@@ -102,6 +102,29 @@ describe('normalizeAuth', () => {
     });
   });
 
+  describe('baseten', () => {
+    it('defaults baseURL to baseten Model APIs endpoint', () => {
+      expect(normalizeAuth('baseten', { api_key: 'sk' })).toEqual({
+        kind: 'apiKey',
+        apiKey: 'sk',
+        baseURL: 'https://inference.baseten.co/v1',
+      });
+    });
+
+    it('respects custom api_url (e.g. Bridge / Direct endpoint)', () => {
+      expect(
+        normalizeAuth('baseten', {
+          api_key: 'sk',
+          api_url: 'https://bridge.baseten.co/v1/direct',
+        }),
+      ).toEqual({
+        kind: 'apiKey',
+        apiKey: 'sk',
+        baseURL: 'https://bridge.baseten.co/v1/direct',
+      });
+    });
+  });
+
   describe('google', () => {
     it('prefers service_key over api_key when both present', () => {
       const result = normalizeAuth('google', {

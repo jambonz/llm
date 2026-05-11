@@ -8,7 +8,7 @@ import { anthropicFactory } from '../../src/adapters/anthropic/index.js';
 import { azureOpenAIFactory } from '../../src/adapters/azure-openai/index.js';
 import { bedrockFactory } from '../../src/adapters/bedrock/index.js';
 import { googleFactory } from '../../src/adapters/google/index.js';
-import { deepseekFactory, openAIFactory } from '../../src/adapters/openai/index.js';
+import { basetenFactory, deepseekFactory, openAIFactory } from '../../src/adapters/openai/index.js';
 import { vertexGeminiFactory } from '../../src/adapters/vertex-gemini/index.js';
 import { vertexOpenAIFactory } from '../../src/adapters/vertex-openai/index.js';
 
@@ -20,6 +20,7 @@ describe('pickAuthKind', () => {
     _resetRegistryForTests();
     registerAdapter(openAIFactory);
     registerAdapter(deepseekFactory);
+    registerAdapter(basetenFactory);
     registerAdapter(anthropicFactory);
     registerAdapter(googleFactory);
     registerAdapter(vertexGeminiFactory);
@@ -41,6 +42,11 @@ describe('pickAuthKind', () => {
 
     it('deepseek returns apiKey', () => {
       const kind = pickAuthKind('deepseek', { api_key: 'x' });
+      expect(kind.kind).toBe('apiKey');
+    });
+
+    it('baseten returns apiKey', () => {
+      const kind = pickAuthKind('baseten', { api_key: 'x' });
       expect(kind.kind).toBe('apiKey');
     });
 

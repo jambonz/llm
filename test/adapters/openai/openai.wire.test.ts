@@ -365,6 +365,14 @@ describe('OpenAI adapter — wire format', () => {
     ).resolves.toBeDefined();
   });
 
+  it('sets Baseten baseURL when using baseten vendor alias', async () => {
+    const { basetenFactory } = await import('../../../src/adapters/openai/index.js');
+    registerAdapter(basetenFactory);
+    await expect(
+      createLlm({ vendor: 'baseten', auth: { kind: 'apiKey', apiKey: 'sk-bt' } }),
+    ).resolves.toBeDefined();
+  });
+
   // ---------------------------------------------------------------------------
   // max_tokens / max_completion_tokens heuristic
   // ---------------------------------------------------------------------------

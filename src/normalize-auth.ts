@@ -40,7 +40,7 @@ export interface RawCredential {
 /**
  * Convert a vendor + raw credential into an `AuthSpec` discriminated union member.
  *
- * Supported vendors: openai, deepseek, anthropic, google, vertex (alias for
+ * Supported vendors: openai, deepseek, baseten, anthropic, google, vertex (alias for
  * vertex-gemini + vertex-openai — both accept the same auth shape), vertex-gemini,
  * vertex-openai, bedrock, azure-openai, groq, huggingface.
  *
@@ -61,6 +61,12 @@ export function normalizeAuth(vendor: string, raw: RawCredential): AuthSpec {
       return {
         ...requireApiKey(vendor, raw),
         baseURL: raw.api_url ?? 'https://api.deepseek.com/v1',
+      };
+
+    case 'baseten':
+      return {
+        ...requireApiKey(vendor, raw),
+        baseURL: raw.api_url ?? 'https://inference.baseten.co/v1',
       };
 
     case 'google':
