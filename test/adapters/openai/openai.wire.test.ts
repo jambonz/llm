@@ -365,6 +365,46 @@ describe('OpenAI adapter — wire format', () => {
     ).resolves.toBeDefined();
   });
 
+  it('sets Baseten baseURL when using baseten vendor alias', async () => {
+    const { basetenFactory } = await import('../../../src/adapters/openai/index.js');
+    registerAdapter(basetenFactory);
+    await expect(
+      createLlm({ vendor: 'baseten', auth: { kind: 'apiKey', apiKey: 'sk-bt' } }),
+    ).resolves.toBeDefined();
+  });
+
+  it('baseten listAvailableModels enriches live ids from basetenManifest, not openAIManifest', async () => {
+    // Regression guard: OpenAIAdapter previously hard-coded openAIManifest.knownModels
+    // for both stream() and listAvailableModels(), so Baseten/DeepSeek aliases lost
+    // their curated capability flags (vision on Kimi K2.5, maxContextTokens, …).
+    const { basetenFactory } = await import('../../../src/adapters/openai/index.js');
+    registerAdapter(basetenFactory);
+    mocks.modelsList.mockResolvedValue({
+      data: [
+        { id: 'moonshotai/Kimi-K2.5' },
+        { id: 'openai/gpt-oss-120b' },
+        { id: 'some-uncurated-model' },
+      ],
+    });
+
+    const adapter = await createLlm({
+      vendor: 'baseten',
+      auth: { kind: 'apiKey', apiKey: 'sk-bt' },
+    });
+    const models = await adapter.listAvailableModels();
+
+    const kimi = models.find((m) => m.id === 'moonshotai/Kimi-K2.5')!;
+    expect(kimi.capabilities.vision).toBe(true);
+    expect(kimi.capabilities.maxContextTokens).toBe(262_000);
+
+    const gptOss = models.find((m) => m.id === 'openai/gpt-oss-120b')!;
+    expect(gptOss.capabilities.maxContextTokens).toBe(128_072);
+
+    const uncurated = models.find((m) => m.id === 'some-uncurated-model')!;
+    expect(uncurated).toBeDefined();
+    expect(uncurated.capabilities.maxContextTokens).toBeUndefined();
+  });
+
   // ---------------------------------------------------------------------------
   // max_tokens / max_completion_tokens heuristic
   // ---------------------------------------------------------------------------
