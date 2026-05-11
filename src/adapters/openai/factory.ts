@@ -106,6 +106,10 @@ class DeepSeekAdapter extends OpenAIAdapter {
       client,
     );
   }
+
+  protected override knownModels() {
+    return deepseekManifest.knownModels;
+  }
 }
 
 export const deepseekFactory: AdapterFactory<ApiKeyAuth> = {
@@ -164,7 +168,7 @@ const basetenManifest: AdapterManifest = {
         tools: true,
         vision: false,
         systemPrompt: true,
-        maxContextTokens: 164_000,
+        maxContextTokens: 163_840,
       },
     },
     {
@@ -175,7 +179,7 @@ const basetenManifest: AdapterManifest = {
         tools: true,
         vision: false,
         systemPrompt: true,
-        maxContextTokens: 131_000,
+        maxContextTokens: 131_072,
       },
     },
     {
@@ -197,7 +201,7 @@ const basetenManifest: AdapterManifest = {
         tools: true,
         vision: false,
         systemPrompt: true,
-        maxContextTokens: 203_000,
+        maxContextTokens: 202_800,
       },
     },
     {
@@ -235,24 +239,24 @@ const basetenManifest: AdapterManifest = {
     },
     {
       id: 'nvidia/Nemotron-120B-A12B',
-      displayName: 'Nemotron Super 120B',
+      displayName: 'Nemotron Super',
       capabilities: {
         streaming: true,
         tools: true,
         vision: false,
         systemPrompt: true,
-        maxContextTokens: 203_000,
+        maxContextTokens: 202_800,
       },
     },
     {
       id: 'openai/gpt-oss-120b',
-      displayName: 'GPT-OSS 120B',
+      displayName: 'OpenAI GPT 120B',
       capabilities: {
         streaming: true,
         tools: true,
         vision: false,
         systemPrompt: true,
-        maxContextTokens: 128_000,
+        maxContextTokens: 128_072,
       },
     },
   ],
@@ -271,6 +275,10 @@ class BasetenAdapter extends OpenAIAdapter {
       },
       client,
     );
+  }
+
+  protected override knownModels() {
+    return basetenManifest.knownModels;
   }
 }
 

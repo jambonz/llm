@@ -61,7 +61,7 @@ export class OpenAIAdapter implements LlmAdapter<ApiKeyAuth> {
 
   stream(req: PromptRequest): AsyncIterable<LlmEvent> {
     return streamFromOpenAI(this.ensureClient(), req, {
-      knownModels: openAIManifest.knownModels,
+      knownModels: this.knownModels(),
       vendorMetadataExtractor: OPENAI_METADATA_EXTRACTOR,
     });
   }
@@ -78,7 +78,17 @@ export class OpenAIAdapter implements LlmAdapter<ApiKeyAuth> {
   }
 
   async listAvailableModels(): Promise<ModelInfo[]> {
-    return listOpenAICompatibleModels(this.ensureClient(), openAIManifest.knownModels);
+    return listOpenAICompatibleModels(this.ensureClient(), this.knownModels());
+  }
+
+  /**
+   * Capability table used to enrich both `stream()` (for tools/vision gating)
+   * and `listAvailableModels()` (for filling capability flags on live entries).
+   * Subclasses backed by the same OpenAI wire (DeepSeek, Baseten, …) override
+   * this so their own manifest entries are consulted instead of OpenAI's.
+   */
+  protected knownModels(): ReadonlyArray<ModelInfo> {
+    return openAIManifest.knownModels;
   }
 
   async testCredential(): Promise<void> {
