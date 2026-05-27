@@ -102,6 +102,11 @@ export async function* streamFromOpenAI(
       (needsMaxCompletionTokens(req.model) ? 'max_completion_tokens' : 'max_tokens');
     (body as unknown as Record<string, unknown>)[param] = effectiveMaxTokens;
   }
+  if (req.reasoningEffort !== undefined) {
+    // OpenAI's `reasoning_effort` has no `minimal` — collapse to `low`.
+    const effort = req.reasoningEffort === 'minimal' ? 'low' : req.reasoningEffort;
+    (body as unknown as Record<string, unknown>).reasoning_effort = effort;
+  }
 
   // hrtime markers for client-side timing breakdown attached to the end event:
   //   t0 = before SDK call
