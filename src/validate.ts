@@ -12,6 +12,7 @@ import type { PromptRequest } from './types.js';
  *   - `model` is a non-empty string.
  *   - `messages` is a non-empty array.
  *   - `messages` does not contain `role: 'system'` turns (use `system` top-level).
+ *   - If `reasoningEffort` is present, it must be one of 'minimal', 'low', 'medium', 'high'.
  */
 export function assertValidRequest(req: PromptRequest): void {
   if (!req || typeof req !== 'object') {
@@ -28,5 +29,13 @@ export function assertValidRequest(req: PromptRequest): void {
       'PromptRequest.messages must not contain role: \'system\'. ' +
         'Pass the system prompt via PromptRequest.system instead.',
     );
+  }
+  if (req.reasoningEffort !== undefined) {
+    const allowed = ['minimal', 'low', 'medium', 'high'] as const;
+    if (!(allowed as readonly string[]).includes(req.reasoningEffort as string)) {
+      throw new Error(
+        `PromptRequest.reasoningEffort must be one of: ${allowed.join(', ')}`,
+      );
+    }
   }
 }

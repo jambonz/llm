@@ -77,6 +77,17 @@ export interface PromptRequest {
   maxTokens?: number;
   /** Abort the stream. Adapters MUST honor this and propagate to the vendor SDK. */
   signal?: AbortSignal;
+  /**
+   * Vendor-neutral thinking/reasoning effort. Adapters that have no
+   * equivalent native parameter ignore it.
+   *
+   * Mapping: gemini → `thinkingConfig.thinkingLevel` (+ `thinkingBudget: 0`
+   * for `minimal` on 2.5 Flash); openai/azure → `reasoning_effort` (only
+   * honored by o-series + gpt-5, `minimal` collapses to `low`); anthropic →
+   * `thinking.budget_tokens` (off for `minimal`/`low`, 2048 for `medium`,
+   * 8192 for `high`).
+   */
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
 export type LlmEvent =

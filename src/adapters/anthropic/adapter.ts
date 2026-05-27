@@ -79,6 +79,12 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
     if (req.system) body.system = req.system;
     if (tools) body.tools = tools;
     if (req.temperature !== undefined) body.temperature = req.temperature;
+    if (req.reasoningEffort === 'medium' || req.reasoningEffort === 'high') {
+      body.thinking = {
+        type: 'enabled',
+        budget_tokens: req.reasoningEffort === 'high' ? 8192 : 2048,
+      };
+    }
 
     let stream;
     let responseHeaders: Headers | undefined;

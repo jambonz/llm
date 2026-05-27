@@ -36,6 +36,9 @@ export async function* streamFromGemini(
   if (req.temperature !== undefined) config.temperature = req.temperature;
   if (req.maxTokens !== undefined) config.maxOutputTokens = req.maxTokens;
   if (req.signal) config.abortSignal = req.signal;
+  if (req.reasoningEffort !== undefined) {
+    config.thinkingConfig = mapReasoningEffortToGemini(req.reasoningEffort);
+  }
 
   let stream;
   try {
@@ -302,6 +305,17 @@ export function defaultGeminiCapabilities() {
     vision: true,
     systemPrompt: true,
   };
+}
+
+// `minimal` sends both knobs so Gemini 2.5 Flash (thinkingBudget) and 3.x
+// (thinkingLevel) each pick up the one they understand.
+function mapReasoningEffortToGemini(
+  level: 'minimal' | 'low' | 'medium' | 'high',
+): Record<string, unknown> {
+  if (level === 'minimal') {
+    return { thinkingLevel: 'minimal', thinkingBudget: 0 };
+  }
+  return { thinkingLevel: level };
 }
 
 function isAbortError(err: unknown): boolean {
