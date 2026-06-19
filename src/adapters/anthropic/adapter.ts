@@ -80,6 +80,16 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
     if (tools) body.tools = tools;
     if (req.temperature !== undefined) body.temperature = req.temperature;
 
+    if (req.cacheKey) {
+      if (req.system) {
+        body.system = [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }];
+      }
+      if (tools) {
+        const lastTool = tools[tools.length - 1];
+        lastTool.cache_control = { type: 'ephemeral' };
+      }
+    }
+
     let stream;
     let responseHeaders: Headers | undefined;
     try {
