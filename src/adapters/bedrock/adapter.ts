@@ -120,6 +120,15 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
       commandInput.inferenceConfig = inferenceConfig;
     }
 
+    if (req.cacheKey) {
+      if (commandInput.system) {
+        (commandInput.system as unknown[]).push({ cachePoint: { type: 'default' } });
+      }
+      if (tools) {
+        (tools.tools as unknown[]).push({ cachePoint: { type: 'default' } });
+      }
+    }
+
     const command = new ConverseStreamCommand(
       commandInput as unknown as ConstructorParameters<typeof ConverseStreamCommand>[0],
     );

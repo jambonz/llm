@@ -95,6 +95,9 @@ export async function* streamFromOpenAI(
     body.tool_choice = 'auto';
   }
   if (req.temperature !== undefined) body.temperature = req.temperature;
+  if (req.cacheKey) {
+    (body as unknown as Record<string, unknown>).prompt_cache_key = req.cacheKey;
+  }
   const effectiveMaxTokens = req.maxTokens ?? options.defaultMaxTokens;
   if (effectiveMaxTokens !== undefined) {
     const param =

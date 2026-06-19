@@ -47,6 +47,16 @@ export async function* streamFromGemini(
     }
   }
 
+  // req.cacheKey is intentionally NOT applied here.
+  // Gemini 2.5 models perform implicit prompt caching server-side automatically —
+  // no request parameter is needed or accepted.  Explicit context caching via
+  // `cachedContent` requires a stateful create/TTL/delete lifecycle that cannot
+  // be driven by a single stateless request field, so it is out of scope for
+  // cacheKey.  This preserves the library's silent-ignore contract: adapters
+  // without a native per-request cache mechanism simply leave cacheKey unread.
+  // Note: this helper is shared by both the Google AI Studio adapter and the
+  // Vertex-Gemini adapter; the same reasoning applies to both.
+
   let stream;
   try {
     stream = await client.models.generateContentStream({
