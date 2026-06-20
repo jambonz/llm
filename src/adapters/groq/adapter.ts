@@ -56,6 +56,9 @@ export class GroqAdapter extends OpenAIAdapter {
     return streamFromOpenAI(this.ensureClient(), req, {
       knownModels: groqManifest.knownModels,
       vendorMetadataExtractor: GROQ_METADATA_EXTRACTOR,
+      // Groq caches automatically server-side and rejects/ignores undocumented
+      // OpenAI params — do not forward prompt_cache_key.
+      includeCacheKey: false,
     });
   }
 }
