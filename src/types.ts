@@ -77,6 +77,23 @@ export interface PromptRequest {
   maxTokens?: number;
   /** Abort the stream. Adapters MUST honor this and propagate to the vendor SDK. */
   signal?: AbortSignal;
+  /**
+   * Caller-supplied prompt-caching routing/grouping hint.
+   *
+   * NOT a secret and NOT a tenant isolation boundary. Cache hits still require
+   * a byte-identical prefix, and vendors isolate caches per org/workspace
+   * regardless of this value.
+   *
+   * Adapter behaviour:
+   *   - OpenAI-wire adapters (openai, azure-openai, groq, etc.) forward it as
+   *     `prompt_cache_key` on the request body.
+   *   - Anthropic and Bedrock (Claude) use its PRESENCE to enable native cache
+   *     breakpoints on the system prompt and last user turn.
+   *   - Adapters without a caching mechanism (e.g. Google/Gemini) silently ignore it.
+   *
+   * The library never auto-derives this value from message content.
+   */
+  cacheKey?: string;
 }
 
 export type LlmEvent =
