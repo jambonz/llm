@@ -581,4 +581,35 @@ describe('OpenAI adapter — wire format', () => {
     expect(end.clientTiming).toBeDefined();
     expect(end.clientTiming!.headersToFirstTokenMs).toBeUndefined();
   });
+
+  it('throws when the stream produces no data (HTTP 200 error-body / wrong base URL)', async () => {
+    mocks.create.mockResolvedValue(mockStream([]));
+    const adapter = await buildAdapter();
+    await expect(
+      drain(adapter, { model: 'gpt-4o', messages: [{ role: 'user', content: 'hi' }] }),
+    ).rejects.toThrow(/produced no data/i);
+  });
+
+  it('throws when a chunk carries a top-level error envelope', async () => {
+    mocks.create.mockResolvedValue(
+      mockStream([{ error: { message: 'insufficient balance' } }]),
+    );
+    const adapter = await buildAdapter();
+    await expect(
+      drain(adapter, { model: 'gpt-4o', messages: [{ role: 'user', content: 'hi' }] }),
+    ).rejects.toThrow(/insufficient balance/i);
+  });
+
+  it('does not throw for a legitimate empty completion (finish_reason only)', async () => {
+    mocks.create.mockResolvedValue(
+      mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
+    );
+    const adapter = await buildAdapter();
+    const events = await drain(adapter, {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    const end = events.find((e) => e.type === 'end') as Extract<LlmEvent, { type: 'end' }>;
+    expect(end.finishReason).toBe('stop');
+  });
 });

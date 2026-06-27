@@ -10,7 +10,13 @@
  */
 
 import { registerAdapter } from '../registry.js';
-import { openAIFactory, deepseekFactory, basetenFactory } from './openai/index.js';
+import {
+  openAIFactory,
+  deepseekFactory,
+  basetenFactory,
+  moonshotFactory,
+  zaiFactory,
+} from './openai/index.js';
 import { anthropicFactory } from './anthropic/index.js';
 import { googleFactory } from './google/index.js';
 import { vertexGeminiFactory } from './vertex-gemini/index.js';
@@ -23,6 +29,8 @@ import { huggingfaceFactory } from './huggingface/index.js';
 registerAdapter(openAIFactory);
 registerAdapter(deepseekFactory);
 registerAdapter(basetenFactory);
+registerAdapter(moonshotFactory);
+registerAdapter(zaiFactory);
 registerAdapter(anthropicFactory);
 registerAdapter(googleFactory);
 registerAdapter(vertexGeminiFactory);

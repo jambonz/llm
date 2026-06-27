@@ -287,3 +287,184 @@ export const basetenFactory: AdapterFactory<ApiKeyAuth> = {
   manifest: basetenManifest,
   create: () => new BasetenAdapter(),
 };
+
+/**
+ * Moonshot (Kimi) alias factory. Moonshot exposes an OpenAI-compatible
+ * Chat Completions surface; the only differences from OpenAI are the default
+ * `baseURL` and the model catalog.
+ *
+ * Note: Moonshot serves a global endpoint (`api.moonshot.ai`) and a China
+ * endpoint (`api.moonshot.cn`). We default to the global one; users override
+ * `baseURL` for `.cn`. Moonshot only accepts the `tools` calling format (the
+ * deprecated `functions` param is unsupported), which is what we already emit.
+ *
+ * Consumers call `createLlm({vendor: 'moonshot', auth: {kind: 'apiKey', apiKey}})`.
+ */
+const moonshotManifest: AdapterManifest = {
+  vendor: 'moonshot',
+  displayName: 'Moonshot (Kimi)',
+  authKinds: [
+    {
+      kind: 'apiKey',
+      displayName: 'API Key',
+      fields: [
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          type: 'password',
+          required: true,
+          help: 'Get an API key from https://platform.moonshot.ai/console/api-keys',
+        },
+        {
+          name: 'baseURL',
+          label: 'Base URL',
+          type: 'url',
+          required: false,
+          default: 'https://api.moonshot.ai/v1',
+          help: 'Defaults to the global endpoint. Set to https://api.moonshot.cn/v1 for the China endpoint.',
+        },
+      ],
+    },
+  ],
+  knownModels: [
+    {
+      id: 'kimi-k2.6',
+      displayName: 'Kimi K2.6',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: true,
+        systemPrompt: true,
+        maxContextTokens: 262_144,
+      },
+    },
+    {
+      id: 'kimi-k2.5',
+      displayName: 'Kimi K2.5',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: true,
+        systemPrompt: true,
+        maxContextTokens: 262_144,
+      },
+    },
+  ],
+  supportsModelListing: true,
+  docsUrl: 'https://platform.moonshot.ai/docs',
+};
+
+class MoonshotAdapter extends OpenAIAdapter {
+  readonly vendor = moonshotManifest.vendor;
+
+  override init(auth: ApiKeyAuth, client?: Parameters<OpenAIAdapter['init']>[1]): void {
+    super.init(
+      {
+        ...auth,
+        baseURL: auth.baseURL ?? 'https://api.moonshot.ai/v1',
+      },
+      client,
+    );
+  }
+
+  protected override knownModels() {
+    return moonshotManifest.knownModels;
+  }
+}
+
+export const moonshotFactory: AdapterFactory<ApiKeyAuth> = {
+  vendor: moonshotManifest.vendor,
+  manifest: moonshotManifest,
+  create: () => new MoonshotAdapter(),
+};
+
+/**
+ * Z.ai (GLM) alias factory. Z.ai's `/api/paas/v4` surface is OpenAI-compatible
+ * for chat completions (it accepts the OpenAI request shape and is what the
+ * OpenAI SDK should target as its baseURL). Note there is NO OpenAI-style
+ * `/models` listing endpoint, so `supportsModelListing` is false and we serve
+ * the static known-models list.
+ *
+ * Note: Coding-Plan subscriptions are served from a *different* endpoint
+ * (`https://api.z.ai/api/coding/paas/v4`), not the general one. Users on a
+ * Coding Plan must override `baseURL` accordingly.
+ *
+ * Consumers call `createLlm({vendor: 'zai', auth: {kind: 'apiKey', apiKey}})`.
+ */
+const zaiManifest: AdapterManifest = {
+  vendor: 'zai',
+  displayName: 'Z.ai (GLM)',
+  authKinds: [
+    {
+      kind: 'apiKey',
+      displayName: 'API Key',
+      fields: [
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          type: 'password',
+          required: true,
+          help: 'Get an API key from https://z.ai/manage-apikey/apikey-list',
+        },
+        {
+          name: 'baseURL',
+          label: 'Base URL',
+          type: 'url',
+          required: false,
+          default: 'https://api.z.ai/api/paas/v4',
+          help: 'Defaults to the general API. Coding-Plan keys must use https://api.z.ai/api/coding/paas/v4.',
+        },
+      ],
+    },
+  ],
+  knownModels: [
+    {
+      id: 'glm-5.2',
+      displayName: 'GLM-5.2',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: false,
+        systemPrompt: true,
+        maxContextTokens: 1_000_000,
+      },
+    },
+    {
+      id: 'glm-4.7',
+      displayName: 'GLM-4.7',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: false,
+        systemPrompt: true,
+        maxContextTokens: 200_000,
+      },
+    },
+  ],
+  supportsModelListing: false,
+  docsUrl: 'https://docs.z.ai/',
+};
+
+class ZaiAdapter extends OpenAIAdapter {
+  readonly vendor = zaiManifest.vendor;
+
+  override init(auth: ApiKeyAuth, client?: Parameters<OpenAIAdapter['init']>[1]): void {
+    super.init(
+      {
+        ...auth,
+        baseURL: auth.baseURL ?? 'https://api.z.ai/api/paas/v4',
+      },
+      client,
+    );
+  }
+
+  protected override knownModels() {
+    return zaiManifest.knownModels;
+  }
+}
+
+export const zaiFactory: AdapterFactory<ApiKeyAuth> = {
+  vendor: zaiManifest.vendor,
+  manifest: zaiManifest,
+  create: () => new ZaiAdapter(),
+};
