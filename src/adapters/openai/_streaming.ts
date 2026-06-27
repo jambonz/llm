@@ -150,12 +150,25 @@ export async function* streamFromOpenAI(
   let usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined;
   let finalFinishReason: FinishReason | null = null;
   let finalRawReason: string | undefined;
+  let sawContent = false;
 
   try {
     for await (const chunk of stream) {
       if (req.signal?.aborted) {
         yield { type: 'end', finishReason: 'aborted' };
         return;
+      }
+
+      // Some OpenAI-compatible backends report failures as a single SSE event
+      // carrying a top-level `error` (instead of a non-2xx status the SDK would
+      // throw on). Surface it rather than silently ending with no output.
+      const chunkError = (chunk as { error?: unknown }).error;
+      if (chunkError) {
+        const message =
+          chunkError && typeof chunkError === 'object' && 'message' in chunkError
+            ? String((chunkError as { message?: unknown }).message)
+            : JSON.stringify(chunkError);
+        throw new Error(`OpenAI-compatible stream returned an error: ${message}`);
       }
 
       if (chunk.usage) {
@@ -180,6 +193,7 @@ export async function* streamFromOpenAI(
 
       if (delta?.content) {
         if (t2 === undefined) t2 = process.hrtime.bigint();
+        sawContent = true;
         yield { type: 'token', text: delta.content };
       }
 
@@ -239,6 +253,26 @@ export async function* streamFromOpenAI(
       return;
     }
     throw err;
+  }
+
+  // A valid completion stream always emits at least a finish_reason. If we got
+  // through the whole stream with no content, no tool calls, no usage, and no
+  // finish reason, the response was not a real completion — typically a
+  // misconfigured base URL or a vendor error returned inside an HTTP 200 body
+  // (which the SDK does not treat as an error). Fail loudly instead of
+  // returning a silent empty turn that a caller would forward to TTS.
+  const producedNothing =
+    finalFinishReason === null &&
+    !sawContent &&
+    toolCallsEmitted.size === 0 &&
+    startedIds.size === 0 &&
+    usage === undefined;
+  if (producedNothing) {
+    throw new Error(
+      'OpenAI-compatible stream produced no data (no content, tool calls, usage, or finish ' +
+        'reason). This usually means a misconfigured base URL or a vendor error returned in an ' +
+        'HTTP 200 body. Verify the base URL and credentials.',
+    );
   }
 
   const endEvent: Extract<LlmEvent, { type: 'end' }> = {
