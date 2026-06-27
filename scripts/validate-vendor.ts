@@ -42,7 +42,7 @@ import {
 
 // ---------------------------------------------------------------------------
 
-const VENDORS = ['moonshot', 'zai', 'minimax'] as const;
+const VENDORS = ['moonshot', 'zai'] as const;
 
 interface Args {
   vendors: string[];
