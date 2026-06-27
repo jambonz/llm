@@ -36,6 +36,7 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "check:bedrock-models": "tsx scripts/check-bedrock-models.ts",
+    "validate:vendor": "tsx scripts/validate-vendor.ts",
     "prepublishOnly": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "keywords": [

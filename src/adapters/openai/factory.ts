@@ -379,8 +379,11 @@ export const moonshotFactory: AdapterFactory<ApiKeyAuth> = {
 };
 
 /**
- * Z.ai (GLM) alias factory. Z.ai exposes an OpenAI-compatible Chat Completions
- * surface at `/api/openai/v1`.
+ * Z.ai (GLM) alias factory. Z.ai's `/api/paas/v4` surface is OpenAI-compatible
+ * for chat completions (it accepts the OpenAI request shape and is what the
+ * OpenAI SDK should target as its baseURL). Note there is NO OpenAI-style
+ * `/models` listing endpoint, so `supportsModelListing` is false and we serve
+ * the static known-models list.
  *
  * Note: Coding-Plan subscriptions are served from a *different* endpoint
  * (`https://api.z.ai/api/coding/paas/v4`), not the general one. Users on a
@@ -408,7 +411,7 @@ const zaiManifest: AdapterManifest = {
           label: 'Base URL',
           type: 'url',
           required: false,
-          default: 'https://api.z.ai/api/openai/v1',
+          default: 'https://api.z.ai/api/paas/v4',
           help: 'Defaults to the general API. Coding-Plan keys must use https://api.z.ai/api/coding/paas/v4.',
         },
       ],
@@ -438,7 +441,7 @@ const zaiManifest: AdapterManifest = {
       },
     },
   ],
-  supportsModelListing: true,
+  supportsModelListing: false,
   docsUrl: 'https://docs.z.ai/',
 };
 
@@ -449,7 +452,7 @@ class ZaiAdapter extends OpenAIAdapter {
     super.init(
       {
         ...auth,
-        baseURL: auth.baseURL ?? 'https://api.z.ai/api/openai/v1',
+        baseURL: auth.baseURL ?? 'https://api.z.ai/api/paas/v4',
       },
       client,
     );
@@ -501,7 +504,7 @@ const minimaxManifest: AdapterManifest = {
   ],
   knownModels: [
     {
-      id: 'minimax-m3',
+      id: 'MiniMax-M3',
       displayName: 'MiniMax-M3',
       capabilities: {
         streaming: true,
@@ -512,7 +515,7 @@ const minimaxManifest: AdapterManifest = {
       },
     },
     {
-      id: 'minimax-m2.5',
+      id: 'MiniMax-M2.5',
       displayName: 'MiniMax-M2.5',
       capabilities: {
         streaming: true,
