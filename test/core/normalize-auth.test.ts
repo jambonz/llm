@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeAuth } from '../../src/normalize-auth.js';
+import { listVendors, getAdapterFactory } from '../../src/index.js';
 
 const SERVICE_KEY_JSON = {
   type: 'service_account',
@@ -295,6 +296,46 @@ describe('normalizeAuth', () => {
         );
       },
     );
+  });
+
+  describe('moonshot / zai (simple apiKey, adapter defaults baseURL)', () => {
+    it('maps api_key to ApiKeyAuth with no forced baseURL', () => {
+      expect(normalizeAuth('moonshot', { api_key: 'sk-moon' })).toEqual({
+        kind: 'apiKey',
+        apiKey: 'sk-moon',
+      });
+      expect(normalizeAuth('zai', { api_key: 'zai-key' })).toEqual({
+        kind: 'apiKey',
+        apiKey: 'zai-key',
+      });
+    });
+
+    it('passes through caller-supplied api_url (Moonshot .cn, Z.ai Coding-Plan)', () => {
+      expect(
+        normalizeAuth('zai', { api_key: 'k', api_url: 'https://api.z.ai/api/coding/paas/v4' }),
+      ).toEqual({
+        kind: 'apiKey',
+        apiKey: 'k',
+        baseURL: 'https://api.z.ai/api/coding/paas/v4',
+      });
+    });
+
+    it('throws when api_key is missing', () => {
+      expect(() => normalizeAuth('zai', {})).toThrowError(/requires 'api_key'/);
+    });
+  });
+
+  describe('registry coverage', () => {
+    it('handles every registered single-apiKey vendor (guards the moonshot/zai gap)', () => {
+      for (const vendor of listVendors()) {
+        const { authKinds } = getAdapterFactory(vendor).manifest;
+        if (authKinds.length !== 1 || authKinds[0]!.kind !== 'apiKey') continue;
+        expect(
+          () => normalizeAuth(vendor, { api_key: 'k' }),
+          `normalizeAuth should handle registered apiKey vendor '${vendor}'`,
+        ).not.toThrow();
+      }
+    });
   });
 
   describe('unknown vendor', () => {
