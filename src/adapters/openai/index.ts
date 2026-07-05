@@ -6,4 +6,5 @@ export {
   basetenFactory,
   moonshotFactory,
   zaiFactory,
+  xaiFactory,
 } from './factory.js';

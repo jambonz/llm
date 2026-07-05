@@ -468,3 +468,110 @@ export const zaiFactory: AdapterFactory<ApiKeyAuth> = {
   manifest: zaiManifest,
   create: () => new ZaiAdapter(),
 };
+
+/**
+ * xAI (Grok) alias factory. xAI serves an OpenAI-compatible Chat Completions
+ * surface; the only differences from OpenAI are the default `baseURL` and
+ * the model catalog.
+ *
+ * Consumers call `createLlm({vendor: 'xai', auth: {kind: 'apiKey', apiKey}})`.
+ */
+const xaiManifest: AdapterManifest = {
+  vendor: 'xai',
+  displayName: 'xAI (Grok)',
+  authKinds: [
+    {
+      kind: 'apiKey',
+      displayName: 'API Key',
+      fields: [
+        {
+          name: 'apiKey',
+          label: 'API Key',
+          type: 'password',
+          required: true,
+          help: 'Get an API key from https://console.x.ai/team/default/api-keys',
+        },
+        {
+          name: 'baseURL',
+          label: 'Base URL',
+          type: 'url',
+          required: false,
+          default: 'https://api.x.ai/v1',
+          help: 'Override for proxy endpoints. Defaults to xAI production.',
+        },
+      ],
+    },
+  ],
+  knownModels: [
+    {
+      id: 'grok-4.3',
+      displayName: 'Grok 4.3',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: true,
+        systemPrompt: true,
+        maxContextTokens: 1_000_000,
+      },
+    },
+    {
+      id: 'grok-4.20-0309-reasoning',
+      displayName: 'Grok 4.20 (Reasoning)',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: true,
+        systemPrompt: true,
+        maxContextTokens: 1_000_000,
+      },
+    },
+    {
+      id: 'grok-4.20-0309-non-reasoning',
+      displayName: 'Grok 4.20 (Non-Reasoning)',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: true,
+        systemPrompt: true,
+        maxContextTokens: 1_000_000,
+      },
+    },
+    {
+      id: 'grok-4.20-multi-agent-0309',
+      displayName: 'Grok 4.20 Multi-Agent',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: true,
+        systemPrompt: true,
+        maxContextTokens: 1_000_000,
+      },
+    },
+  ],
+  supportsModelListing: true,
+  docsUrl: 'https://docs.x.ai/',
+};
+
+class XaiAdapter extends OpenAIAdapter {
+  readonly vendor = xaiManifest.vendor;
+
+  override init(auth: ApiKeyAuth, client?: Parameters<OpenAIAdapter['init']>[1]): void {
+    super.init(
+      {
+        ...auth,
+        baseURL: auth.baseURL ?? 'https://api.x.ai/v1',
+      },
+      client,
+    );
+  }
+
+  protected override knownModels() {
+    return xaiManifest.knownModels;
+  }
+}
+
+export const xaiFactory: AdapterFactory<ApiKeyAuth> = {
+  vendor: xaiManifest.vendor,
+  manifest: xaiManifest,
+  create: () => new XaiAdapter(),
+};
