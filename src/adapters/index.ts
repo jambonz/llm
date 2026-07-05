@@ -16,6 +16,7 @@ import {
   basetenFactory,
   moonshotFactory,
   zaiFactory,
+  xaiFactory,
 } from './openai/index.js';
 import { anthropicFactory } from './anthropic/index.js';
 import { googleFactory } from './google/index.js';
@@ -31,6 +32,7 @@ registerAdapter(deepseekFactory);
 registerAdapter(basetenFactory);
 registerAdapter(moonshotFactory);
 registerAdapter(zaiFactory);
+registerAdapter(xaiFactory);
 registerAdapter(anthropicFactory);
 registerAdapter(googleFactory);
 registerAdapter(vertexGeminiFactory);
