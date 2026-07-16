@@ -612,4 +612,44 @@ describe('OpenAI adapter — wire format', () => {
     const end = events.find((e) => e.type === 'end') as Extract<LlmEvent, { type: 'end' }>;
     expect(end.finishReason).toBe('stop');
   });
+
+  it('merges providerParams into the request body (e.g. Kimi enable_thinking:false)', async () => {
+    mocks.create.mockResolvedValue(
+      mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
+    );
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: 'kimi-k2.5',
+      messages: [{ role: 'user', content: 'hi' }],
+      providerParams: { chat_template_kwargs: { enable_thinking: false } },
+    });
+    const [body] = mocks.create.mock.calls[0]!;
+    expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
+  });
+
+  it('providerParams is add-only — cannot override library-managed fields', async () => {
+    mocks.create.mockResolvedValue(
+      mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
+    );
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'hi' }],
+      providerParams: { model: 'evil', stream: false, extra_flag: 1 },
+    });
+    const [body] = mocks.create.mock.calls[0]!;
+    expect(body.model).toBe('gpt-4o'); // not clobbered
+    expect(body.stream).toBe(true); // not clobbered
+    expect(body.extra_flag).toBe(1); // non-colliding key added
+  });
+
+  it('omits provider params entirely when not supplied', async () => {
+    mocks.create.mockResolvedValue(
+      mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
+    );
+    const adapter = await buildAdapter();
+    await drain(adapter, { model: 'gpt-4o', messages: [{ role: 'user', content: 'hi' }] });
+    const [body] = mocks.create.mock.calls[0]!;
+    expect(body.chat_template_kwargs).toBeUndefined();
+  });
 });

@@ -75,6 +75,16 @@ export interface PromptRequest {
   tools?: Tool[];
   temperature?: number;
   maxTokens?: number;
+  /**
+   * Provider-specific request-body parameters merged verbatim into the
+   * outgoing request by OpenAI-compatible adapters. Opt-in escape hatch for
+   * fields the typed interface does not model — e.g. a vLLM/Mantle-served
+   * Kimi endpoint's `{chat_template_kwargs: {enable_thinking: false}}` to
+   * suppress chain-of-thought. Never sent unless set. Keys that collide with
+   * library-managed fields (model, messages, stream, tools, …) are ignored,
+   * so this can only add parameters, never override core request shape.
+   */
+  providerParams?: Record<string, unknown>;
   /** Abort the stream. Adapters MUST honor this and propagate to the vendor SDK. */
   signal?: AbortSignal;
 }

@@ -103,6 +103,16 @@ export async function* streamFromOpenAI(
     (body as unknown as Record<string, unknown>)[param] = effectiveMaxTokens;
   }
 
+  // Merge caller-supplied provider-specific params (e.g. Kimi's
+  // chat_template_kwargs). Add-only: never overwrite a library-managed field,
+  // so this can extend the request but not corrupt its core shape.
+  if (req.providerParams) {
+    const bodyRecord = body as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(req.providerParams)) {
+      if (!(key in bodyRecord)) bodyRecord[key] = value;
+    }
+  }
+
   // hrtime markers for client-side timing breakdown attached to the end event:
   //   t0 = before SDK call
   //   t1 = response headers received (after withResponse resolves)
