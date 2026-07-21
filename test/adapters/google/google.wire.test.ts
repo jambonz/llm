@@ -99,6 +99,44 @@ describe('Google Gemini adapter — wire format', () => {
     ]);
   });
 
+  it('merges providerParams into config (e.g. Gemini 3 thinkingConfig)', async () => {
+    mocks.generateContentStream.mockResolvedValue(
+      mockStream([{ candidates: [{ content: { parts: [] }, finishReason: 'STOP' }] }]),
+    );
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: 'gemini-3.5-flash-lite',
+      messages: [{ role: 'user', content: 'hi' }],
+      providerParams: { thinkingConfig: { thinkingLevel: 'low' } },
+    });
+    const [arg] = mocks.generateContentStream.mock.calls[0]!;
+    expect(arg.config.thinkingConfig).toEqual({ thinkingLevel: 'low' });
+  });
+
+  it('providerParams is add-only — cannot override library-managed fields', async () => {
+    mocks.generateContentStream.mockResolvedValue(
+      mockStream([{ candidates: [{ content: { parts: [] }, finishReason: 'STOP' }] }]),
+    );
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: 'gemini-3.5-flash-lite',
+      system: 'You are a test agent.',
+      messages: [{ role: 'user', content: 'hi' }],
+      temperature: 0.5,
+      providerParams: {
+        systemInstruction: 'evil',
+        temperature: 2,
+        extraFlag: 1,
+      },
+    });
+    const [arg] = mocks.generateContentStream.mock.calls[0]!;
+    expect(arg.config.systemInstruction).toEqual({
+      parts: [{ text: 'You are a test agent.' }],
+    }); // not clobbered
+    expect(arg.config.temperature).toBe(0.5); // not clobbered
+    expect(arg.config.extraFlag).toBe(1); // non-colliding key added
+  });
+
   it('wraps tools in functionDeclarations and preserves JSON schema as parameters', async () => {
     mocks.generateContentStream.mockResolvedValue(
       mockStream([{ candidates: [{ content: { parts: [] }, finishReason: 'STOP' }] }]),
