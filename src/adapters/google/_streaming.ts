@@ -47,6 +47,16 @@ export async function* streamFromGemini(
     }
   }
 
+  // req.cacheKey is intentionally NOT applied here.
+  // Gemini 2.5 models perform implicit prompt caching server-side automatically —
+  // no request parameter is needed or accepted.  Explicit context caching via
+  // `cachedContent` requires a stateful create/TTL/delete lifecycle that cannot
+  // be driven by a single stateless request field, so it is out of scope for
+  // cacheKey.  This preserves the library's silent-ignore contract: adapters
+  // without a native per-request cache mechanism simply leave cacheKey unread.
+  // Note: this helper is shared by both the Google AI Studio adapter and the
+  // Vertex-Gemini adapter; the same reasoning applies to both.
+
   let stream;
   try {
     stream = await client.models.generateContentStream({
@@ -68,6 +78,7 @@ export async function* streamFromGemini(
   let inputTokens: number | undefined;
   let outputTokens: number | undefined;
   let totalTokens: number | undefined;
+  let cacheReadTokens: number | undefined;
 
   try {
     for await (const chunk of stream) {
@@ -78,7 +89,16 @@ export async function* streamFromGemini(
 
       const usage = chunk.usageMetadata;
       if (usage) {
-        if (usage.promptTokenCount !== undefined) inputTokens = usage.promptTokenCount;
+        // Gemini's promptTokenCount INCLUDES implicitly-cached tokens
+        // (cachedContentTokenCount is a sub-detail). Subtract it out so
+        // inputTokens means UNCACHED input, per the library's additive
+        // Usage convention.
+        if (usage.cachedContentTokenCount !== undefined) {
+          cacheReadTokens = usage.cachedContentTokenCount;
+        }
+        if (usage.promptTokenCount !== undefined) {
+          inputTokens = usage.promptTokenCount - (usage.cachedContentTokenCount ?? 0);
+        }
         if (usage.candidatesTokenCount !== undefined) outputTokens = usage.candidatesTokenCount;
         if (usage.totalTokenCount !== undefined) totalTokens = usage.totalTokenCount;
       }
@@ -141,6 +161,7 @@ export async function* streamFromGemini(
           ...(inputTokens !== undefined ? { inputTokens } : {}),
           ...(outputTokens !== undefined ? { outputTokens } : {}),
           ...(totalTokens !== undefined ? { totalTokens } : {}),
+          ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
         }
       : undefined;
 

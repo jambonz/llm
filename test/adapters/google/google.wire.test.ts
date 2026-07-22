@@ -137,6 +137,34 @@ describe('Google Gemini adapter — wire format', () => {
     expect(arg.config.extraFlag).toBe(1); // non-colliding key added
   });
 
+  it('subtracts cachedContentTokenCount so inputTokens means UNCACHED input, surfacing cacheReadTokens', async () => {
+    mocks.generateContentStream.mockResolvedValue(
+      mockStream([
+        {
+          candidates: [{ content: { role: 'model', parts: [] }, finishReason: 'STOP' }],
+          usageMetadata: {
+            promptTokenCount: 912,
+            candidatesTokenCount: 7,
+            totalTokenCount: 919,
+            cachedContentTokenCount: 900,
+          },
+        },
+      ]),
+    );
+    const adapter = await buildAdapter();
+    const events = await drain(adapter, {
+      model: 'gemini-3.5-flash-lite',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    const end = events[events.length - 1] as Extract<LlmEvent, { type: 'end' }>;
+    expect(end.usage).toEqual({
+      inputTokens: 12,
+      outputTokens: 7,
+      totalTokens: 919,
+      cacheReadTokens: 900,
+    });
+  });
+
   it('wraps tools in functionDeclarations and preserves JSON schema as parameters', async () => {
     mocks.generateContentStream.mockResolvedValue(
       mockStream([{ candidates: [{ content: { parts: [] }, finishReason: 'STOP' }] }]),

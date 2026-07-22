@@ -12,6 +12,7 @@ import type { PromptRequest } from './types.js';
  *   - `model` is a non-empty string.
  *   - `messages` is a non-empty array.
  *   - `messages` does not contain `role: 'system'` turns (use `system` top-level).
+ *   - `cacheKey`, when present, is a non-empty string.
  */
 export function assertValidRequest(req: PromptRequest): void {
   if (!req || typeof req !== 'object') {
@@ -28,5 +29,8 @@ export function assertValidRequest(req: PromptRequest): void {
       'PromptRequest.messages must not contain role: \'system\'. ' +
         'Pass the system prompt via PromptRequest.system instead.',
     );
+  }
+  if (req.cacheKey !== undefined && (typeof req.cacheKey !== 'string' || req.cacheKey.length === 0)) {
+    throw new Error('PromptRequest.cacheKey must be a non-empty string');
   }
 }

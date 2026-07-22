@@ -120,6 +120,22 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
       commandInput.inferenceConfig = inferenceConfig;
     }
 
+    if (req.cacheKey) {
+      if (commandInput.system) {
+        (commandInput.system as unknown[]).push({ cachePoint: { type: 'default' } });
+      }
+      if (tools) {
+        (tools.tools as unknown[]).push({ cachePoint: { type: 'default' } });
+      }
+      // Third cache point after the final message's content so the ENTIRE
+      // conversation prefix is cached, not just system + tools. In the
+      // append-only conversation pattern each turn's request extends the
+      // previous one, so the moving cache point hits the prior turn's cache
+      // via longest-prefix matching. Without this, the growing history — the
+      // bulk of mid-call input tokens — is re-billed at full price every turn.
+      markLastMessageForCaching(messages);
+    }
+
     const command = new ConverseStreamCommand(
       commandInput as unknown as ConstructorParameters<typeof ConverseStreamCommand>[0],
     );
@@ -146,6 +162,8 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
     let inputTokens: number | undefined;
     let outputTokens: number | undefined;
     let totalTokens: number | undefined;
+    let cacheReadTokens: number | undefined;
+    let cacheWriteTokens: number | undefined;
 
     try {
       for await (const event of response.stream as AsyncIterable<BedrockStreamEvent>) {
@@ -197,9 +215,14 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
           stopReason = event.messageStop.stopReason;
         } else if (event.metadata) {
           if (event.metadata.usage) {
+            // Converse's inputTokens EXCLUDES cache activity — the read and
+            // write classes arrive in their own fields, matching the
+            // library's additive Usage convention with no adjustment needed.
             inputTokens = event.metadata.usage.inputTokens;
             outputTokens = event.metadata.usage.outputTokens;
             totalTokens = event.metadata.usage.totalTokens;
+            cacheReadTokens = event.metadata.usage.cacheReadInputTokens;
+            cacheWriteTokens = event.metadata.usage.cacheWriteInputTokens;
           }
         }
       }
@@ -232,6 +255,8 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
             ...(inputTokens !== undefined ? { inputTokens } : {}),
             ...(outputTokens !== undefined ? { outputTokens } : {}),
             ...(totalTokens !== undefined ? { totalTokens } : {}),
+            ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+            ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
           }
         : undefined;
 
@@ -383,7 +408,13 @@ interface BedrockStreamEvent {
   contentBlockStop?: { contentBlockIndex?: number };
   messageStop?: { stopReason?: string };
   metadata?: {
-    usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+    usage?: {
+      inputTokens?: number;
+      outputTokens?: number;
+      totalTokens?: number;
+      cacheReadInputTokens?: number;
+      cacheWriteInputTokens?: number;
+    };
   };
 }
 
@@ -410,6 +441,24 @@ function buildWireMessages(req: PromptRequest): unknown[] {
     });
   }
   return out;
+}
+
+/**
+ * Replace the last wire message with a copy whose content array gains a
+ * trailing `{cachePoint: {type: 'default'}}` block. COPY, never mutate: the
+ * `vendorRaw` entries in `messages` are the caller's history objects, and a
+ * cache point persisted there would accumulate one per turn — past the
+ * service's 4-cache-point limit the request is rejected outright.
+ */
+function markLastMessageForCaching(messages: unknown[]): void {
+  if (messages.length === 0) return;
+  const last = messages[messages.length - 1] as { content?: unknown };
+  if (Array.isArray(last.content) && last.content.length > 0) {
+    messages[messages.length - 1] = {
+      ...last,
+      content: [...last.content, { cachePoint: { type: 'default' } }],
+    };
+  }
 }
 
 function formatTools(tools: Tool[]): Array<Record<string, unknown>> {

@@ -52,6 +52,14 @@ export async function* streamFromOpenAI(
      */
     tokensParam?: 'max_tokens' | 'max_completion_tokens';
     /**
+     * Whether to forward `req.cacheKey` as the `prompt_cache_key` request
+     * param. Defaults to `true` (OpenAI/Azure/Vertex-OpenAI/Baseten all
+     * accept it). Set to `false` for Groq, which caches automatically
+     * server-side and does not document this param (per Groq's strict
+     * OpenAI-compat param handling).
+     */
+    includeCacheKey?: boolean;
+    /**
      * Optional adapter-supplied extractor that pulls vendor-specific
      * diagnostic data off the upstream HTTP response headers (request
      * id, rate-limit remaining, routing info, etc.) and returns it as
@@ -95,6 +103,9 @@ export async function* streamFromOpenAI(
     body.tool_choice = 'auto';
   }
   if (req.temperature !== undefined) body.temperature = req.temperature;
+  if (req.cacheKey && options.includeCacheKey !== false) {
+    (body as unknown as Record<string, unknown>).prompt_cache_key = req.cacheKey;
+  }
   const effectiveMaxTokens = req.maxTokens ?? options.defaultMaxTokens;
   if (effectiveMaxTokens !== undefined) {
     const param =
@@ -182,9 +193,13 @@ export async function* streamFromOpenAI(
       }
 
       if (chunk.usage) {
+        // OpenAI's prompt_tokens INCLUDES cached tokens (cached_tokens is a
+        // sub-detail). Subtract it out so inputTokens means UNCACHED input,
+        // per the library's additive Usage convention.
+        const cachedTokens = chunk.usage.prompt_tokens_details?.cached_tokens;
         usage = {
           ...(chunk.usage.prompt_tokens !== undefined
-            ? { inputTokens: chunk.usage.prompt_tokens }
+            ? { inputTokens: chunk.usage.prompt_tokens - (cachedTokens ?? 0) }
             : {}),
           ...(chunk.usage.completion_tokens !== undefined
             ? { outputTokens: chunk.usage.completion_tokens }
@@ -192,6 +207,7 @@ export async function* streamFromOpenAI(
           ...(chunk.usage.total_tokens !== undefined
             ? { totalTokens: chunk.usage.total_tokens }
             : {}),
+          ...(cachedTokens !== undefined ? { cacheReadTokens: cachedTokens } : {}),
         };
       }
 
