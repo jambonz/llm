@@ -199,3 +199,127 @@ describe('Anthropic adapter — cache_control injection (cacheKey)', () => {
     3000,
   );
 });
+
+// ---------------------------------------------------------------------------
+// Conversation-history breakpoint + cache-token usage normalization
+// ---------------------------------------------------------------------------
+
+describe('Anthropic adapter — history breakpoint and cache-token usage', () => {
+  beforeEach(() => {
+    _resetRegistryForTests();
+    registerAdapter(anthropicFactory);
+    mocks.create.mockReset();
+    mocks.modelsList.mockReset();
+  });
+
+  afterEach(() => {
+    _resetRegistryForTests();
+    mocks.create.mockReset();
+    mocks.modelsList.mockReset();
+  });
+
+  it('cacheKey present: last message string content becomes a text block with cache_control; earlier messages untouched', async () => {
+    mocks.create.mockResolvedValue(minimalStream());
+    const adapter = await buildAdapter();
+    const messages: PromptRequest['messages'] = [
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: 'hello' },
+      { role: 'user', content: 'ship my order' },
+    ];
+    await drain(adapter, {
+      model: 'claude-sonnet-4-6',
+      system: SYSTEM_PROMPT,
+      messages,
+      cacheKey: 'session-abc',
+    });
+    const body = mocks.create.mock.calls[0]![0] as Record<string, unknown>;
+    const wire = body.messages as Array<Record<string, unknown>>;
+    expect(wire[0]).toEqual({ role: 'user', content: 'hi' });
+    expect(wire[1]).toEqual({ role: 'assistant', content: 'hello' });
+    expect(wire[2]).toEqual({
+      role: 'user',
+      content: [{ type: 'text', text: 'ship my order', cache_control: { type: 'ephemeral' } }],
+    });
+    // The caller's history must be untouched.
+    expect(messages[2]).toEqual({ role: 'user', content: 'ship my order' });
+  });
+
+  it('cacheKey present: vendorRaw last message gets cache_control on its last block WITHOUT mutating the history object', async () => {
+    // A tool_result turn as produced by appendToolResult().
+    const vendorRaw = {
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: 'lookup_order', content: 'shipped' }],
+    };
+    mocks.create.mockResolvedValue(minimalStream());
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: 'claude-sonnet-4-6',
+      messages: [
+        { role: 'user', content: 'hi' },
+        { role: 'tool', content: 'shipped', vendorRaw },
+      ],
+      cacheKey: 'session-abc',
+    });
+    const body = mocks.create.mock.calls[0]![0] as Record<string, unknown>;
+    const wire = body.messages as Array<Record<string, unknown>>;
+    const lastBlocks = (wire[1] as { content: Array<Record<string, unknown>> }).content;
+    expect(lastBlocks[lastBlocks.length - 1]!.cache_control).toEqual({ type: 'ephemeral' });
+    // The history object must NOT accumulate the marker: a persisted
+    // cache_control would add one breakpoint per turn until Anthropic's
+    // 4-breakpoint limit rejects the request outright.
+    expect(vendorRaw.content[0]).toEqual({
+      type: 'tool_result',
+      tool_use_id: 'lookup_order',
+      content: 'shipped',
+    });
+  });
+
+  it('cacheKey absent: messages stay untouched (no history breakpoint)', async () => {
+    mocks.create.mockResolvedValue(minimalStream());
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: 'claude-sonnet-4-6',
+      messages: [{ role: 'user', content: 'hello' }],
+    });
+    const body = mocks.create.mock.calls[0]![0] as Record<string, unknown>;
+    expect(body.messages).toEqual([{ role: 'user', content: 'hello' }]);
+  });
+
+  it('normalizes cache-token usage: input_tokens is uncached; read/write surface; totalTokens sums all classes', async () => {
+    mocks.create.mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        yield {
+          type: 'message_start',
+          message: {
+            usage: {
+              input_tokens: 12,
+              output_tokens: 0,
+              cache_read_input_tokens: 900,
+              cache_creation_input_tokens: 40,
+            },
+          },
+        };
+        yield {
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn' },
+          usage: { output_tokens: 7 },
+        };
+        yield { type: 'message_stop' };
+      },
+    });
+    const adapter = await buildAdapter();
+    const events = await drain(adapter, {
+      model: 'claude-sonnet-4-6',
+      messages: [{ role: 'user', content: 'hi' }],
+      cacheKey: 'session-abc',
+    });
+    const end = events.find((e) => e.type === 'end') as Extract<LlmEvent, { type: 'end' }>;
+    expect(end.usage).toEqual({
+      inputTokens: 12,
+      outputTokens: 7,
+      totalTokens: 12 + 7 + 900 + 40,
+      cacheReadTokens: 900,
+      cacheWriteTokens: 40,
+    });
+  });
+});

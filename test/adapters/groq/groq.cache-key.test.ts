@@ -47,7 +47,7 @@ function minimalStream(): AsyncIterable<Record<string, unknown>> {
 
 /** Drain the stream so the adapter finishes building its body. */
 async function drain(adapter: LlmAdapter, req: PromptRequest): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   for await (const _ of adapter.stream(req)) {
     // drain only; body-shape assertions are on the captured create() call
   }

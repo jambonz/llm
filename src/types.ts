@@ -98,7 +98,8 @@ export interface PromptRequest {
    *   - OpenAI-wire adapters (openai, azure-openai, groq, etc.) forward it as
    *     `prompt_cache_key` on the request body.
    *   - Anthropic and Bedrock (Claude) use its PRESENCE to enable native cache
-   *     breakpoints on the system prompt and last user turn.
+   *     breakpoints on the system prompt, the tool definitions, and the final
+   *     message — so the entire conversation prefix is cached each turn.
    *   - Adapters without a caching mechanism (e.g. Google/Gemini) silently ignore it.
    *
    * The library never auto-derives this value from message content.
@@ -165,9 +166,26 @@ export type FinishReason =
   | 'aborted';
 
 export interface Usage {
+  /**
+   * UNCACHED input tokens. The three input classes (uncached, cache read,
+   * cache write) are additive and each has its own vendor price, so callers
+   * can meter/bill them independently. Adapters normalize to this convention:
+   * Anthropic/Bedrock already report exclusively; OpenAI-wire and Gemini
+   * report an inclusive prompt total and the adapter subtracts the cached
+   * portion out.
+   */
   inputTokens?: number;
   outputTokens?: number;
+  /** Vendor-reported grand total across all token classes. */
   totalTokens?: number;
+  /** Input tokens served from the vendor's prompt cache (discounted). */
+  cacheReadTokens?: number;
+  /**
+   * Input tokens written to the vendor's prompt cache. Only Anthropic-family
+   * vendors bill cache writes (at a premium); vendors that don't report the
+   * class omit the field.
+   */
+  cacheWriteTokens?: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -251,3 +251,93 @@ describe('Bedrock adapter — cacheKey → cachePoint injection', () => {
     5000,
   );
 });
+
+// ---------------------------------------------------------------------------
+// Conversation-history cache point + cache-token usage normalization
+// ---------------------------------------------------------------------------
+
+describe('Bedrock adapter — history cache point and cache-token usage', () => {
+  beforeEach(() => {
+    _resetRegistryForTests();
+    registerAdapter(bedrockFactory);
+    bedrockMock.reset();
+  });
+
+  afterEach(() => {
+    _resetRegistryForTests();
+    bedrockMock.reset();
+  });
+
+  it('cacheKey present: cachePoint appended to the last message content; earlier messages and history untouched', async () => {
+    bedrockMock.on(ConverseStreamCommand).resolvesOnce({
+      stream: mockStream([{ messageStop: { stopReason: 'end_turn' } }]) as never,
+    });
+    // A tool_result turn as produced by appendToolResult().
+    const vendorRaw = {
+      role: 'user',
+      content: [{ toolResult: { toolUseId: 'tool-1', content: [{ text: 'shipped' }] } }],
+    };
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model: MODEL,
+      messages: [
+        { role: 'user', content: 'hi' },
+        { role: 'tool', content: 'shipped', vendorRaw },
+      ],
+      cacheKey: 'session-abc',
+    });
+
+    const call = bedrockMock.commandCalls(ConverseStreamCommand)[0]!;
+    const input = call.args[0].input as unknown as Record<string, unknown>;
+    const wire = input.messages as Array<{ role: string; content: Array<Record<string, unknown>> }>;
+
+    // Earlier message untouched
+    expect(wire[0]).toEqual({ role: 'user', content: [{ text: 'hi' }] });
+
+    // Last message: original block preserved, cachePoint appended after it
+    const lastContent = wire[1]!.content;
+    expect(lastContent).toHaveLength(2);
+    expect(lastContent[0]).toEqual({
+      toolResult: { toolUseId: 'tool-1', content: [{ text: 'shipped' }] },
+    });
+    expect(lastContent[1]).toEqual(CACHE_POINT);
+
+    // The history object must NOT accumulate the cache point: a persisted
+    // block would add one per turn until the service's 4-point limit
+    // rejects the request outright.
+    expect(vendorRaw.content).toHaveLength(1);
+  });
+
+  it('normalizes Converse cache-token usage fields onto the end event', async () => {
+    bedrockMock.on(ConverseStreamCommand).resolvesOnce({
+      stream: mockStream([
+        { messageStop: { stopReason: 'end_turn' } },
+        {
+          metadata: {
+            usage: {
+              inputTokens: 12,
+              outputTokens: 7,
+              totalTokens: 959,
+              cacheReadInputTokens: 900,
+              cacheWriteInputTokens: 40,
+            },
+          },
+        },
+      ]) as never,
+    });
+    const adapter = await buildAdapter();
+    const events = await drain(adapter, {
+      model: MODEL,
+      messages: [{ role: 'user', content: 'hi' }],
+      cacheKey: 'session-abc',
+    });
+    const end = events.find((e) => e.type === 'end') as Extract<LlmEvent, { type: 'end' }>;
+    expect(end.usage).toEqual({
+      inputTokens: 12,
+      outputTokens: 7,
+      totalTokens: 959,
+      cacheReadTokens: 900,
+      cacheWriteTokens: 40,
+    });
+  });
+});

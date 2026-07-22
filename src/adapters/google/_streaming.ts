@@ -78,6 +78,7 @@ export async function* streamFromGemini(
   let inputTokens: number | undefined;
   let outputTokens: number | undefined;
   let totalTokens: number | undefined;
+  let cacheReadTokens: number | undefined;
 
   try {
     for await (const chunk of stream) {
@@ -88,7 +89,16 @@ export async function* streamFromGemini(
 
       const usage = chunk.usageMetadata;
       if (usage) {
-        if (usage.promptTokenCount !== undefined) inputTokens = usage.promptTokenCount;
+        // Gemini's promptTokenCount INCLUDES implicitly-cached tokens
+        // (cachedContentTokenCount is a sub-detail). Subtract it out so
+        // inputTokens means UNCACHED input, per the library's additive
+        // Usage convention.
+        if (usage.cachedContentTokenCount !== undefined) {
+          cacheReadTokens = usage.cachedContentTokenCount;
+        }
+        if (usage.promptTokenCount !== undefined) {
+          inputTokens = usage.promptTokenCount - (usage.cachedContentTokenCount ?? 0);
+        }
         if (usage.candidatesTokenCount !== undefined) outputTokens = usage.candidatesTokenCount;
         if (usage.totalTokenCount !== undefined) totalTokens = usage.totalTokenCount;
       }
@@ -151,6 +161,7 @@ export async function* streamFromGemini(
           ...(inputTokens !== undefined ? { inputTokens } : {}),
           ...(outputTokens !== undefined ? { outputTokens } : {}),
           ...(totalTokens !== undefined ? { totalTokens } : {}),
+          ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
         }
       : undefined;
 

@@ -193,9 +193,13 @@ export async function* streamFromOpenAI(
       }
 
       if (chunk.usage) {
+        // OpenAI's prompt_tokens INCLUDES cached tokens (cached_tokens is a
+        // sub-detail). Subtract it out so inputTokens means UNCACHED input,
+        // per the library's additive Usage convention.
+        const cachedTokens = chunk.usage.prompt_tokens_details?.cached_tokens;
         usage = {
           ...(chunk.usage.prompt_tokens !== undefined
-            ? { inputTokens: chunk.usage.prompt_tokens }
+            ? { inputTokens: chunk.usage.prompt_tokens - (cachedTokens ?? 0) }
             : {}),
           ...(chunk.usage.completion_tokens !== undefined
             ? { outputTokens: chunk.usage.completion_tokens }
@@ -203,6 +207,7 @@ export async function* streamFromOpenAI(
           ...(chunk.usage.total_tokens !== undefined
             ? { totalTokens: chunk.usage.total_tokens }
             : {}),
+          ...(cachedTokens !== undefined ? { cacheReadTokens: cachedTokens } : {}),
         };
       }
 

@@ -43,7 +43,7 @@ function minimalStream(): AsyncIterable<Record<string, unknown>> {
 }
 
 async function drain(adapter: LlmAdapter, req: PromptRequest): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   for await (const _ of adapter.stream(req)) {
     // drain only; do not assert events
   }

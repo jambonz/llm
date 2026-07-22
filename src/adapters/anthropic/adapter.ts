@@ -88,6 +88,13 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
         const lastTool = tools[tools.length - 1];
         lastTool.cache_control = { type: 'ephemeral' };
       }
+      // Third breakpoint on the final message so the ENTIRE conversation
+      // prefix is cached, not just system + tools. In the append-only
+      // conversation pattern each turn's request extends the previous one,
+      // so the moving breakpoint hits the prior turn's cache via Anthropic's
+      // longest-prefix matching. Without this, the growing history — the
+      // bulk of mid-call input tokens — is re-billed at full price every turn.
+      markLastMessageForCaching(messages);
     }
 
     let stream;
@@ -127,6 +134,8 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
     let stopReason: string | undefined;
     let inputTokens: number | undefined;
     let outputTokens: number | undefined;
+    let cacheReadTokens: number | undefined;
+    let cacheWriteTokens: number | undefined;
 
     try {
       for await (const event of stream as unknown as AsyncIterable<AnthropicStreamEvent>) {
@@ -137,7 +146,12 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
 
         switch (event.type) {
           case 'message_start':
+            // Anthropic's input_tokens EXCLUDES cache activity — the read and
+            // write classes arrive in their own fields, matching the library's
+            // additive Usage convention with no adjustment needed.
             inputTokens = event.message?.usage?.input_tokens;
+            cacheReadTokens = event.message?.usage?.cache_read_input_tokens;
+            cacheWriteTokens = event.message?.usage?.cache_creation_input_tokens;
             break;
 
           case 'content_block_start': {
@@ -236,8 +250,13 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
             ...(inputTokens !== undefined ? { inputTokens } : {}),
             ...(outputTokens !== undefined ? { outputTokens } : {}),
             ...(inputTokens !== undefined && outputTokens !== undefined
-              ? { totalTokens: inputTokens + outputTokens }
+              ? {
+                  totalTokens:
+                    inputTokens + outputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0),
+                }
               : {}),
+            ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+            ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
           }
         : undefined;
 
@@ -358,7 +377,13 @@ interface CompletedToolCall {
 
 interface AnthropicStreamEvent {
   type: string;
-  message?: { usage?: { input_tokens?: number } };
+  message?: {
+    usage?: {
+      input_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+    };
+  };
   content_block?: { type?: string; id?: string; name?: string };
   delta?: {
     type?: string;
@@ -383,6 +408,33 @@ function buildWireMessages(req: PromptRequest): unknown[] {
     }
   }
   return out;
+}
+
+/**
+ * Replace the last wire message with a copy whose final content block
+ * carries `cache_control: {type: 'ephemeral'}`. COPY, never mutate: the
+ * `vendorRaw` entries in `messages` are the caller's history objects, and a
+ * marker persisted there would accumulate one breakpoint per turn — past
+ * Anthropic's 4-breakpoint limit the request is rejected outright.
+ */
+function markLastMessageForCaching(messages: unknown[]): void {
+  if (messages.length === 0) return;
+  const last = messages[messages.length - 1] as { content?: unknown };
+  const cacheControl = { cache_control: { type: 'ephemeral' } };
+  if (typeof last.content === 'string' && last.content.length > 0) {
+    messages[messages.length - 1] = {
+      ...last,
+      content: [{ type: 'text', text: last.content, ...cacheControl }],
+    };
+  } else if (Array.isArray(last.content) && last.content.length > 0) {
+    const blocks = last.content as Array<Record<string, unknown>>;
+    messages[messages.length - 1] = {
+      ...last,
+      content: [...blocks.slice(0, -1), { ...blocks[blocks.length - 1], ...cacheControl }],
+    };
+  }
+  // Empty content (e.g. a bare assistant placeholder) is left unmarked —
+  // an empty text block with cache_control would be rejected by the API.
 }
 
 function formatTools(tools: Tool[]): Array<Record<string, unknown>> {

@@ -279,6 +279,35 @@ describe('OpenAI adapter — wire format', () => {
     expect(end.usage?.totalTokens).toBeDefined();
   });
 
+  it('subtracts cached_tokens so inputTokens means UNCACHED input, surfacing cacheReadTokens', async () => {
+    mocks.create.mockResolvedValue(
+      mockStream([
+        { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+        {
+          choices: [],
+          usage: {
+            prompt_tokens: 912,
+            completion_tokens: 7,
+            total_tokens: 919,
+            prompt_tokens_details: { cached_tokens: 900 },
+          },
+        },
+      ]),
+    );
+    const adapter = await buildAdapter();
+    const events = await drain(adapter, {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    const end = events[events.length - 1] as Extract<LlmEvent, { type: 'end' }>;
+    expect(end.usage).toEqual({
+      inputTokens: 12,
+      outputTokens: 7,
+      totalTokens: 919,
+      cacheReadTokens: 900,
+    });
+  });
+
   it('preserves vendorRaw assistant message with tool_calls on re-submission', async () => {
     mocks.create.mockResolvedValue(
       mockStream([{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }]),
