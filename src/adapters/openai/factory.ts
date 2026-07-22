@@ -110,6 +110,12 @@ class DeepSeekAdapter extends OpenAIAdapter {
   protected override knownModels() {
     return deepseekManifest.knownModels;
   }
+
+  // DeepSeek caches automatically server-side; prompt_cache_key is
+  // unverified against its param handling — do not forward.
+  protected override forwardCacheKey(): boolean {
+    return false;
+  }
 }
 
 export const deepseekFactory: AdapterFactory<ApiKeyAuth> = {
@@ -370,6 +376,13 @@ class MoonshotAdapter extends OpenAIAdapter {
   protected override knownModels() {
     return moonshotManifest.knownModels;
   }
+
+  // Moonshot's param handling is strict (e.g. it rejects unknown template
+  // kwargs) and prompt_cache_key is unverified against both the native
+  // endpoint and Bedrock Mantle deployments — do not forward.
+  protected override forwardCacheKey(): boolean {
+    return false;
+  }
 }
 
 export const moonshotFactory: AdapterFactory<ApiKeyAuth> = {
@@ -460,6 +473,12 @@ class ZaiAdapter extends OpenAIAdapter {
 
   protected override knownModels() {
     return zaiManifest.knownModels;
+  }
+
+  // prompt_cache_key is unverified against Zai's OpenAI-compat endpoint —
+  // do not forward.
+  protected override forwardCacheKey(): boolean {
+    return false;
   }
 }
 
@@ -567,6 +586,12 @@ class XaiAdapter extends OpenAIAdapter {
 
   protected override knownModels() {
     return xaiManifest.knownModels;
+  }
+
+  // xAI caches automatically server-side; prompt_cache_key is unverified
+  // against its param handling — do not forward.
+  protected override forwardCacheKey(): boolean {
+    return false;
   }
 }
 

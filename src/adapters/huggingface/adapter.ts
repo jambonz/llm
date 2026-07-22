@@ -52,6 +52,9 @@ export class HuggingfaceAdapter extends OpenAIAdapter {
     return streamFromOpenAI(this.ensureClient(), req, {
       knownModels: huggingfaceManifest.knownModels,
       vendorMetadataExtractor: HUGGINGFACE_METADATA_EXTRACTOR,
+      // The HF router fronts many third-party inference providers;
+      // prompt_cache_key is unverified against them — do not forward.
+      includeCacheKey: false,
     });
   }
 }

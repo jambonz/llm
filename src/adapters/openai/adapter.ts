@@ -63,6 +63,7 @@ export class OpenAIAdapter implements LlmAdapter<ApiKeyAuth> {
     return streamFromOpenAI(this.ensureClient(), req, {
       knownModels: this.knownModels(),
       vendorMetadataExtractor: OPENAI_METADATA_EXTRACTOR,
+      includeCacheKey: this.forwardCacheKey(),
     });
   }
 
@@ -89,6 +90,21 @@ export class OpenAIAdapter implements LlmAdapter<ApiKeyAuth> {
    */
   protected knownModels(): ReadonlyArray<ModelInfo> {
     return openAIManifest.knownModels;
+  }
+
+  /**
+   * Whether to forward `req.cacheKey` as OpenAI's `prompt_cache_key` request
+   * param. Default true — verified accepted by OpenAI, Azure OpenAI,
+   * Vertex-OpenAI, and Baseten. OpenAI-compatible vendors whose param
+   * handling is strict or unverified (DeepSeek, Moonshot, Zai, xAI — and
+   * Groq via its own stream override) override to false: a strict backend
+   * rejects the whole request on an unknown body param, which is far worse
+   * than forgoing a cache-routing hint. Flip a vendor to true only after
+   * verifying its endpoint (including any proxy in front of it, e.g.
+   * Bedrock Mantle) tolerates the param.
+   */
+  protected forwardCacheKey(): boolean {
+    return true;
   }
 
   async testCredential(): Promise<void> {
