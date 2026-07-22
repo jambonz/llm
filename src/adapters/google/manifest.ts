@@ -4,10 +4,44 @@ import type { AdapterManifest, ModelInfo } from '../../types.js';
  * Known Gemini models. Model listing via `listAvailableModels()` hits the
  * live endpoint; this curated list drives the admin-UI dropdown.
  *
- * All Gemini models in this list support tools and streaming. Only the
- * `-lite` flash variants lose vision support.
+ * All Gemini models in this list support tools and streaming. Only
+ * `gemini-2.0-flash-lite` loses vision support — the 3.x `-lite` variants
+ * are fully multimodal.
  */
 const GOOGLE_KNOWN_MODELS: ModelInfo[] = [
+  {
+    id: 'gemini-3.6-flash',
+    displayName: 'Gemini 3.6 Flash',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 1_000_000,
+    },
+  },
+  {
+    id: 'gemini-3.5-flash',
+    displayName: 'Gemini 3.5 Flash',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 1_000_000,
+    },
+  },
+  {
+    id: 'gemini-3.5-flash-lite',
+    displayName: 'Gemini 3.5 Flash-Lite',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 1_000_000,
+    },
+  },
   {
     id: 'gemini-2.5-pro',
     displayName: 'Gemini 2.5 Pro',

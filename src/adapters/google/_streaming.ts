@@ -37,6 +37,16 @@ export async function* streamFromGemini(
   if (req.maxTokens !== undefined) config.maxOutputTokens = req.maxTokens;
   if (req.signal) config.abortSignal = req.signal;
 
+  // Merge caller-supplied provider-specific params into the generation
+  // config (e.g. Gemini 3's thinkingConfig). Add-only: never overwrite a
+  // library-managed field, so this can extend the request but not corrupt
+  // its core shape.
+  if (req.providerParams) {
+    for (const [key, value] of Object.entries(req.providerParams)) {
+      if (!(key in config)) config[key] = value;
+    }
+  }
+
   let stream;
   try {
     stream = await client.models.generateContentStream({

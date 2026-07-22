@@ -9,6 +9,39 @@ import type { AdapterManifest, ModelInfo } from '../../types.js';
  */
 const VERTEX_GEMINI_KNOWN_MODELS: ModelInfo[] = [
   {
+    id: 'gemini-3.6-flash',
+    displayName: 'Gemini 3.6 Flash',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 1_000_000,
+    },
+  },
+  {
+    id: 'gemini-3.5-flash',
+    displayName: 'Gemini 3.5 Flash',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 1_000_000,
+    },
+  },
+  {
+    id: 'gemini-3.5-flash-lite',
+    displayName: 'Gemini 3.5 Flash-Lite',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 1_000_000,
+    },
+  },
+  {
     id: 'gemini-2.5-pro',
     displayName: 'Gemini 2.5 Pro',
     capabilities: {
