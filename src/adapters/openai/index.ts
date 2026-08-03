@@ -7,4 +7,5 @@ export {
   moonshotFactory,
   zaiFactory,
   xaiFactory,
+  bedrockMantleFactory,
 } from './factory.js';

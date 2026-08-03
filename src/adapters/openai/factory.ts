@@ -600,3 +600,142 @@ export const xaiFactory: AdapterFactory<ApiKeyAuth> = {
   manifest: xaiManifest,
   create: () => new XaiAdapter(),
 };
+
+/**
+ * AWS Bedrock "Mantle" alias factory — Bedrock's OpenAI-compatible surface,
+ * which resells third-party open-weight models (Z.ai GLM, Moonshot Kimi, xAI
+ * Grok, DeepSeek, MiniMax, Qwen, …) behind ONE endpoint and ONE Bedrock API
+ * key. This is deliberately vendor-neutral: the model id carries the provider
+ * (`zai.glm-5`, `moonshotai.kimi-k2.5`), so a newly-launched Bedrock model is
+ * usable by setting `model` — no adapter change and no library release.
+ *
+ * Prefer this over the per-provider aliases (`zai`, `moonshot`, `xai`) when the
+ * credential is a Bedrock API key rather than a native vendor key. Those
+ * aliases differ from this one only in their default `baseURL`.
+ *
+ * Note the path split: most models are served on `/v1`, but xAI models are
+ * served ONLY on `/openai/v1`. A `401 "Berm is not enabled"` means the wrong
+ * path, not a missing entitlement — override `baseURL` for those.
+ *
+ * This is NOT the `bedrock` adapter, which speaks Bedrock's native Converse
+ * API via the AWS SDK and supports SigV4/IAM auth. Use that one for Anthropic
+ * and Amazon Nova models; use this one for the OpenAI-compatible catalog.
+ *
+ * Consumers call `createLlm({vendor: 'bedrock-mantle', auth: {kind: 'apiKey', apiKey}})`.
+ */
+const BEDROCK_MANTLE_DEFAULT_BASE_URL = 'https://bedrock-mantle.us-east-1.api.aws/v1';
+
+const bedrockMantleManifest: AdapterManifest = {
+  vendor: 'bedrock-mantle',
+  displayName: 'AWS Bedrock (OpenAI-compatible)',
+  authKinds: [
+    {
+      kind: 'apiKey',
+      displayName: 'API Key',
+      fields: [
+        {
+          name: 'apiKey',
+          label: 'Bedrock API Key',
+          type: 'password',
+          required: true,
+          help: 'Generate a long-term Bedrock API key in the AWS console (Amazon Bedrock → API keys).',
+        },
+        {
+          name: 'baseURL',
+          label: 'Base URL',
+          type: 'url',
+          required: false,
+          default: BEDROCK_MANTLE_DEFAULT_BASE_URL,
+          help: 'Change the region to match your key. xAI models are served only on the /openai/v1 path.',
+        },
+      ],
+    },
+  ],
+  /* A convenience seed, NOT the source of truth: the live `/v1/models`
+   * endpoint is authoritative and grows continuously, which is why
+   * `supportsModelListing` is true. Any model the endpoint lists can be used
+   * by id without appearing here.
+   *
+   * AWS publishes no context-window metadata (neither `/v1/models` nor
+   * `GetFoundationModel` returns it), so these limits are carried over from
+   * the native-vendor manifests above for the same underlying models. Vision
+   * follows Bedrock's `inputModalities`. */
+  knownModels: [
+    {
+      id: 'zai.glm-5',
+      displayName: 'GLM 5',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: false,
+        systemPrompt: true,
+        maxContextTokens: 202_800,
+      },
+    },
+    {
+      id: 'zai.glm-4.7',
+      displayName: 'GLM 4.7',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: false,
+        systemPrompt: true,
+        maxContextTokens: 200_000,
+      },
+    },
+    {
+      id: 'moonshotai.kimi-k2.5',
+      displayName: 'Kimi K2.5',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: true,
+        systemPrompt: true,
+        maxContextTokens: 262_144,
+      },
+    },
+    {
+      id: 'xai.grok-4.3',
+      displayName: 'Grok 4.3',
+      capabilities: {
+        streaming: true,
+        tools: true,
+        vision: true,
+        systemPrompt: true,
+        maxContextTokens: 1_000_000,
+      },
+    },
+  ],
+  supportsModelListing: true,
+  docsUrl: 'https://docs.aws.amazon.com/bedrock/latest/userguide/inference-chat-completions.html',
+};
+
+class BedrockMantleAdapter extends OpenAIAdapter {
+  readonly vendor = bedrockMantleManifest.vendor;
+
+  override init(auth: ApiKeyAuth, client?: Parameters<OpenAIAdapter['init']>[1]): void {
+    super.init(
+      {
+        ...auth,
+        baseURL: auth.baseURL ?? BEDROCK_MANTLE_DEFAULT_BASE_URL,
+      },
+      client,
+    );
+  }
+
+  protected override knownModels() {
+    return bedrockMantleManifest.knownModels;
+  }
+
+  // Mantle fronts many third-party runtimes with differing param strictness,
+  // and prompt_cache_key is unverified against all of them — do not forward.
+  protected override forwardCacheKey(): boolean {
+    return false;
+  }
+}
+
+export const bedrockMantleFactory: AdapterFactory<ApiKeyAuth> = {
+  vendor: bedrockMantleManifest.vendor,
+  manifest: bedrockMantleManifest,
+  create: () => new BedrockMantleAdapter(),
+};

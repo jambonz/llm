@@ -40,9 +40,10 @@ export interface RawCredential {
 /**
  * Convert a vendor + raw credential into an `AuthSpec` discriminated union member.
  *
- * Supported vendors: openai, deepseek, baseten, moonshot, zai, xai, anthropic, google,
- * vertex (alias for vertex-gemini + vertex-openai — both accept the same auth shape),
- * vertex-gemini, vertex-openai, bedrock, azure-openai, groq, huggingface.
+ * Supported vendors: openai, deepseek, baseten, moonshot, zai, xai, bedrock-mantle,
+ * anthropic, google, vertex (alias for vertex-gemini + vertex-openai — both accept
+ * the same auth shape), vertex-gemini, vertex-openai, bedrock, azure-openai, groq,
+ * huggingface.
  *
  * Throws with a clear message if the raw credential is missing required fields.
  */
@@ -55,10 +56,12 @@ export function normalizeAuth(vendor: string, raw: RawCredential): AuthSpec {
     case 'moonshot':
     case 'zai':
     case 'xai':
+    case 'bedrock-mantle':
       // Standard ApiKeyAuth; these adapters default baseURL in init() if the
       // caller doesn't supply one (e.g. api.groq.com, router.huggingface.co,
       // api.moonshot.ai/v1, api.z.ai/api/paas/v4, api.x.ai/v1). A user-supplied
-      // api_url (e.g. Moonshot .cn, or Z.ai's Coding-Plan endpoint) is passed
+      // api_url (e.g. Moonshot .cn, Z.ai's Coding-Plan endpoint, or a Bedrock
+      // Mantle region / the /openai/v1 path xAI models require) is passed
       // through.
       return requireApiKey(vendor, raw);
 

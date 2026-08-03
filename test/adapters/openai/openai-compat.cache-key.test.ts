@@ -32,6 +32,7 @@ import {
   moonshotFactory,
   zaiFactory,
   xaiFactory,
+  bedrockMantleFactory,
 } from '../../../src/adapters/openai/index.js';
 import { huggingfaceFactory } from '../../../src/adapters/huggingface/index.js';
 import type { AdapterFactory, LlmAdapter, PromptRequest } from '../../../src/types.js';
@@ -97,6 +98,7 @@ describe('OpenAI-compatible adapters — prompt_cache_key gating', () => {
     ['moonshot', moonshotFactory],
     ['zai', zaiFactory],
     ['xai', xaiFactory],
+    ['bedrock-mantle', bedrockMantleFactory],
     ['huggingface', huggingfaceFactory],
   ] as Array<[string, AdapterFactory]>)(
     '%s does NOT forward prompt_cache_key (unverified endpoint)',
