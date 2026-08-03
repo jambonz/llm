@@ -325,6 +325,35 @@ describe('normalizeAuth', () => {
     });
   });
 
+  describe('bedrock-mantle (Bedrock api key, adapter defaults baseURL)', () => {
+    it('maps api_key to ApiKeyAuth with no forced baseURL', () => {
+      expect(normalizeAuth('bedrock-mantle', { api_key: 'bedrock-key' })).toEqual({
+        kind: 'apiKey',
+        apiKey: 'bedrock-key',
+      });
+    });
+
+    /* the hosted-resale path stores the Mantle URL on the supplier row and
+     * passes it as api_url; xAI models are served only on /openai/v1, so
+     * dropping it here would 401 */
+    it('passes through caller-supplied api_url (region, and the xAI /openai/v1 path)', () => {
+      expect(
+        normalizeAuth('bedrock-mantle', {
+          api_key: 'k',
+          api_url: 'https://bedrock-mantle.us-east-1.api.aws/openai/v1',
+        }),
+      ).toEqual({
+        kind: 'apiKey',
+        apiKey: 'k',
+        baseURL: 'https://bedrock-mantle.us-east-1.api.aws/openai/v1',
+      });
+    });
+
+    it('throws when api_key is missing', () => {
+      expect(() => normalizeAuth('bedrock-mantle', {})).toThrowError(/requires 'api_key'/);
+    });
+  });
+
   describe('registry coverage', () => {
     it('handles every registered single-apiKey vendor (guards the moonshot/zai gap)', () => {
       for (const vendor of listVendors()) {
