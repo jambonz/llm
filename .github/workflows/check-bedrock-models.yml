@@ -4,10 +4,21 @@ name: check-bedrock-models
 # against AWS's live lifecycle data; opens a PR if any model is now LEGACY but
 # not yet flagged deprecated.
 #
-# IAM permissions required on the AWS credentials:
-#   - bedrock:ListFoundationModels
-#   - bedrock:ListInferenceProfiles
-# Both are read-only. No model data is accessed.
+# AWS access is via GitHub OIDC — no long-lived keys are stored in this
+# public repo. One-time setup, in the AWS account that should be queried:
+#
+#   1. Register GitHub as an OIDC provider:
+#        Provider URL: https://token.actions.githubusercontent.com
+#        Audience:     sts.amazonaws.com
+#   2. Create a role trusted by that provider, restricted to this repo:
+#        "token.actions.githubusercontent.com:sub":
+#          "repo:jambonz/llm:ref:refs/heads/main"
+#   3. Attach an inline policy allowing only (both read-only, no model data
+#      is accessed):
+#        - bedrock:ListFoundationModels
+#        - bedrock:ListInferenceProfiles
+#   4. Set the repo Actions *variable* BEDROCK_DRIFT_ROLE_ARN to the role ARN.
+#      A role ARN is not a secret, so a variable is the right home for it.
 
 on:
   schedule:
@@ -20,6 +31,7 @@ jobs:
     permissions:
       contents: write        # peter-evans/create-pull-request writes the branch
       pull-requests: write   # …and opens the PR
+      id-token: write        # …and OIDC needs to mint a token for AWS
     steps:
       - uses: actions/checkout@v5
 
@@ -29,11 +41,13 @@ jobs:
 
       - run: npm ci
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.BEDROCK_DRIFT_ROLE_ARN }}
+          aws-region: us-east-1
+
       - name: Run drift checker with --write
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: us-east-1
         run: npm run check:bedrock-models -- --write
 
       - name: Open PR if manifest changed
