@@ -182,21 +182,27 @@ export async function* streamFromGemini(
 export function appendGeminiAssistantToolCall(
   history: Message[],
   toolCalls: ReadonlyArray<Extract<LlmEvent, { type: 'toolCall' }>>,
+  assistantText?: string,
 ): Message[] {
+  // A text part may precede functionCall parts in the same model turn.
+  const text = assistantText?.trim() ? assistantText : null;
   const wireMessage = {
     role: 'model',
-    parts: toolCalls.map((tc) => ({
-      functionCall: {
-        name: parseToolName(tc.id),
-        args: tc.arguments ?? {},
-      },
-    })),
+    parts: [
+      ...(text ? [{ text }] : []),
+      ...toolCalls.map((tc) => ({
+        functionCall: {
+          name: parseToolName(tc.id),
+          args: tc.arguments ?? {},
+        },
+      })),
+    ],
   };
   return [
     ...history,
     {
       role: 'assistant',
-      content: '',
+      content: text ?? '',
       vendorRaw: wireMessage,
     },
   ];

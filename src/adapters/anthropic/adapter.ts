@@ -280,21 +280,29 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
   appendAssistantToolCall(
     history: Message[],
     toolCalls: ReadonlyArray<ToolCallEvent>,
+    assistantText?: string,
   ): Message[] {
+    // A text block may precede tool_use blocks in the same assistant turn.
+    // Anthropic rejects an empty text block, so it is only included when the
+    // model actually said something before calling the tool.
+    const text = assistantText?.trim() ? assistantText : null;
     const wireMessage = {
       role: 'assistant',
-      content: toolCalls.map((tc) => ({
-        type: 'tool_use',
-        id: tc.id,
-        name: tc.name,
-        input: tc.arguments ?? {},
-      })),
+      content: [
+        ...(text ? [{ type: 'text', text }] : []),
+        ...toolCalls.map((tc) => ({
+          type: 'tool_use',
+          id: tc.id,
+          name: tc.name,
+          input: tc.arguments ?? {},
+        })),
+      ],
     };
     return [
       ...history,
       {
         role: 'assistant',
-        content: '',
+        content: text ?? '',
         vendorRaw: wireMessage,
       },
     ];

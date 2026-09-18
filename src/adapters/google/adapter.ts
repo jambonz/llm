@@ -51,8 +51,9 @@ export class GoogleAdapter implements LlmAdapter<GoogleApiKeyAuth> {
   appendAssistantToolCall(
     history: Message[],
     toolCalls: ReadonlyArray<ToolCallEvent>,
+    assistantText?: string,
   ): Message[] {
-    return appendGeminiAssistantToolCall(history, toolCalls);
+    return appendGeminiAssistantToolCall(history, toolCalls, assistantText);
   }
 
   appendToolResult(history: Message[], toolCallId: string, result: unknown): Message[] {

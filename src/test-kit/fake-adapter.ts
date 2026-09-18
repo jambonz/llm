@@ -92,13 +92,16 @@ export class FakeAdapter implements LlmAdapter<ApiKeyAuth> {
   appendAssistantToolCall(
     history: Message[],
     toolCalls: ReadonlyArray<ToolCallEvent>,
+    assistantText?: string,
   ): Message[] {
+    const text = assistantText?.trim() ? assistantText : null;
     return [
       ...history,
       {
         role: 'assistant',
-        content: '',
+        content: text ?? '',
         vendorRaw: {
+          ...(text ? { text } : {}),
           role: 'assistant',
           toolCalls: toolCalls.map((tc) => ({
             id: tc.id,

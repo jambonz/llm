@@ -416,6 +416,66 @@ export function runContractTests(harness: ContractHarness): void {
       expect(appended.role).toBe('assistant');
       expect(appended.vendorRaw).toBeDefined();
     });
+
+    it('[22] appendAssistantToolCall carries pre-tool assistant text onto the wire', async () => {
+      await harness.mockScenario('tool-call');
+      const adapter = await init(harness);
+      const first = await drainStream(adapter, {
+        model: harness.toolCapableModel,
+        messages: [{ role: 'user', content: 'go' }],
+        tools: [
+          { name: 'test_tool', description: 'x', parameters: { type: 'object' } },
+        ],
+      });
+      const tc = first.find(
+        (e): e is Extract<LlmEvent, { type: 'toolCall' }> => e.type === 'toolCall',
+      );
+      expect(tc).toBeDefined();
+
+      // Text the model emitted before calling the tool. Dropping it makes the
+      // model believe it never spoke, so it repeats itself after the tool
+      // result — the caller hears the same sentence twice.
+      const preToolText = 'Checking that now.';
+      const history = adapter.appendAssistantToolCall(
+        [{ role: 'user', content: 'go' }],
+        [tc!],
+        preToolText,
+      );
+      const appended = history[history.length - 1]!;
+      expect(appended.content).toBe(preToolText);
+      // Vendors encode it differently (a string, a text block, a text part),
+      // so assert on the serialized wire message rather than a fixed shape.
+      expect(JSON.stringify(appended.vendorRaw)).toContain(preToolText);
+    });
+
+    it('[23] appendAssistantToolCall omits empty pre-tool text from the wire', async () => {
+      await harness.mockScenario('tool-call');
+      const adapter = await init(harness);
+      const first = await drainStream(adapter, {
+        model: harness.toolCapableModel,
+        messages: [{ role: 'user', content: 'go' }],
+        tools: [
+          { name: 'test_tool', description: 'x', parameters: { type: 'object' } },
+        ],
+      });
+      const tc = first.find(
+        (e): e is Extract<LlmEvent, { type: 'toolCall' }> => e.type === 'toolCall',
+      );
+      expect(tc).toBeDefined();
+
+      // Anthropic and Bedrock reject an empty text block, so a blank string
+      // must not produce one. Omitting the argument entirely is the same case.
+      for (const blank of [undefined, '', '   ']) {
+        const history = adapter.appendAssistantToolCall(
+          [{ role: 'user', content: 'go' }],
+          [tc!],
+          blank,
+        );
+        const appended = history[history.length - 1]!;
+        expect(appended.content).toBe('');
+        expect(JSON.stringify(appended.vendorRaw)).not.toContain('"text":""');
+      }
+    });
   });
 }
 

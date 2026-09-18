@@ -332,10 +332,12 @@ export async function* streamFromOpenAI(
 export function appendOpenAIAssistantToolCall(
   history: Message[],
   toolCalls: ReadonlyArray<Extract<LlmEvent, { type: 'toolCall' }>>,
+  assistantText?: string,
 ): Message[] {
+  const text = assistantText?.trim() ? assistantText : null;
   const wireMessage = {
     role: 'assistant',
-    content: null,
+    content: text,
     tool_calls: toolCalls.map((tc) => ({
       id: tc.id,
       type: 'function',
@@ -351,7 +353,7 @@ export function appendOpenAIAssistantToolCall(
     ...history,
     {
       role: 'assistant',
-      content: '',
+      content: text ?? '',
       vendorRaw: wireMessage,
     },
   ];
