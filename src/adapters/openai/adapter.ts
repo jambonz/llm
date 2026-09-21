@@ -70,8 +70,9 @@ export class OpenAIAdapter implements LlmAdapter<ApiKeyAuth> {
   appendAssistantToolCall(
     history: Message[],
     toolCalls: ReadonlyArray<ToolCallEvent>,
+    assistantText?: string,
   ): Message[] {
-    return appendOpenAIAssistantToolCall(history, toolCalls);
+    return appendOpenAIAssistantToolCall(history, toolCalls, assistantText);
   }
 
   appendToolResult(history: Message[], toolCallId: string, result: unknown): Message[] {

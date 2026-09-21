@@ -61,6 +61,7 @@ export class TemplateAdapter implements LlmAdapter<ApiKeyAuth> {
   appendAssistantToolCall(
     _history: Message[],
     _toolCalls: ReadonlyArray<ToolCallEvent>,
+    _assistantText?: string,
   ): Message[] {
     // TODO: append an assistant turn containing the given tool calls to
     // history, in the vendor's native shape. This turn must precede the
@@ -72,10 +73,12 @@ export class TemplateAdapter implements LlmAdapter<ApiKeyAuth> {
     //     ...history,
     //     {
     //       role: 'assistant',
-    //       content: '',
+    //       content: assistantText ?? '',
     //       vendorRaw: {
     //         role: 'assistant',
-    //         content: null,
+    //         // text the model emitted before the call — carry it, or the
+    //         // model repeats itself on the post-tool turn
+    //         content: assistantText || null,
     //         tool_calls: toolCalls.map((tc) => ({
     //           id: tc.id,
     //           type: 'function',

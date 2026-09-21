@@ -298,22 +298,29 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
   appendAssistantToolCall(
     history: Message[],
     toolCalls: ReadonlyArray<ToolCallEvent>,
+    assistantText?: string,
   ): Message[] {
+    // Converse allows a text block before toolUse blocks in the same turn;
+    // an empty one is rejected, so it is only included when non-blank.
+    const text = assistantText?.trim() ? assistantText : null;
     const wireMessage = {
       role: 'assistant',
-      content: toolCalls.map((tc) => ({
-        toolUse: {
-          toolUseId: tc.id,
-          name: tc.name,
-          input: tc.arguments ?? {},
-        },
-      })),
+      content: [
+        ...(text ? [{ text }] : []),
+        ...toolCalls.map((tc) => ({
+          toolUse: {
+            toolUseId: tc.id,
+            name: tc.name,
+            input: tc.arguments ?? {},
+          },
+        })),
+      ],
     };
     return [
       ...history,
       {
         role: 'assistant',
-        content: '',
+        content: text ?? '',
         vendorRaw: wireMessage,
       },
     ];

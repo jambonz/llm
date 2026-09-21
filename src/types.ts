@@ -408,10 +408,17 @@ export interface LlmAdapter<A extends AuthSpec = AuthSpec> {
    * content:[{type:'tool_use',...}]}`; Google: `{role:'model',
    * parts:[{functionCall,...}]}`; etc.). The returned `Message` carries the
    * wire shape in `vendorRaw` and is round-trippable through `stream()`.
+   *
+   * `assistantText` is any text the model emitted BEFORE the tool calls in the
+   * same turn. Vendors allow it alongside the call (OpenAI: `content`;
+   * Anthropic and Google: a text block/part preceding the call), and dropping
+   * it makes the model believe it never spoke — on the post-tool turn it
+   * repeats itself. Adapters MUST carry it onto the wire when non-empty.
    */
   appendAssistantToolCall(
     history: Message[],
     toolCalls: ReadonlyArray<ToolCallEvent>,
+    assistantText?: string,
   ): Message[];
 
   /**
