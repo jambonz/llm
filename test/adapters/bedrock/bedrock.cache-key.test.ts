@@ -341,3 +341,79 @@ describe('Bedrock adapter — history cache point and cache-token usage', () => 
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Per-model cache point support. Bedrock rejects a cachePoint in a field the
+// model doesn't support (Nova: "#/toolConfig/tools/N: extraneous key
+// [cachePoint] is not permitted"), failing the whole prompt.
+// ---------------------------------------------------------------------------
+
+describe('Bedrock adapter — cachePoint gated by model support', () => {
+  beforeEach(() => {
+    _resetRegistryForTests();
+    registerAdapter(bedrockFactory);
+    bedrockMock.reset();
+  });
+
+  afterEach(() => {
+    _resetRegistryForTests();
+    bedrockMock.reset();
+  });
+
+  async function sendWithCacheKey(model: string): Promise<Record<string, unknown>> {
+    bedrockMock.on(ConverseStreamCommand).resolvesOnce({
+      stream: mockStream([{ messageStop: { stopReason: 'end_turn' } }]) as never,
+    });
+    const adapter = await buildAdapter();
+    await drain(adapter, {
+      model,
+      system: 'You are a helpful assistant.',
+      messages: [{ role: 'user', content: 'hello' }],
+      cacheKey: 'session-abc',
+      tools: [
+        {
+          name: 'lookup_order',
+          description: 'Find an order by ID',
+          parameters: { type: 'object', properties: { id: { type: 'string' } } },
+        },
+      ],
+    });
+    return bedrockMock.commandCalls(ConverseStreamCommand)[0]!.args[0]
+      .input as unknown as Record<string, unknown>;
+  }
+
+  const hasCachePoint = (arr: unknown[]): boolean =>
+    arr.some((el) => (el as Record<string, unknown>).cachePoint !== undefined);
+
+  it.each(['amazon.nova-lite-v1:0', 'us.amazon.nova-pro-v1:0'])(
+    '%s: cachePoint on system and messages, but NOT on toolConfig.tools',
+    async (model) => {
+      const input = await sendWithCacheKey(model);
+      const tools = (input.toolConfig as { tools: unknown[] }).tools;
+      expect(tools).toHaveLength(1);
+      expect(hasCachePoint(tools)).toBe(false);
+      const system = input.system as unknown[];
+      expect(system[system.length - 1]).toEqual(CACHE_POINT);
+      const messages = input.messages as Array<{ content: unknown[] }>;
+      expect(messages[0]!.content[messages[0]!.content.length - 1]).toEqual(CACHE_POINT);
+    },
+  );
+
+  it('cross-region Claude profile: cachePoint on tools, system and messages', async () => {
+    const input = await sendWithCacheKey('us.anthropic.claude-sonnet-4-5-20250929-v1:0');
+    const tools = (input.toolConfig as { tools: unknown[] }).tools;
+    expect(tools[tools.length - 1]).toEqual(CACHE_POINT);
+    const system = input.system as unknown[];
+    expect(system[system.length - 1]).toEqual(CACHE_POINT);
+    const messages = input.messages as Array<{ content: unknown[] }>;
+    expect(messages[0]!.content[messages[0]!.content.length - 1]).toEqual(CACHE_POINT);
+  });
+
+  it('model without explicit caching (Llama): no cachePoint anywhere', async () => {
+    const input = await sendWithCacheKey('meta.llama3-70b-instruct-v1:0');
+    expect(hasCachePoint((input.toolConfig as { tools: unknown[] }).tools)).toBe(false);
+    expect(hasCachePoint(input.system as unknown[])).toBe(false);
+    const messages = input.messages as Array<{ content: unknown[] }>;
+    expect(hasCachePoint(messages[0]!.content)).toBe(false);
+  });
+});
