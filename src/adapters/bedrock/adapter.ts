@@ -120,11 +120,12 @@ export class BedrockAdapter implements LlmAdapter<BedrockAuthSpec> {
       commandInput.inferenceConfig = inferenceConfig;
     }
 
-    if (req.cacheKey) {
+    const caching = req.cacheKey ? cachePointSupport(req.model) : undefined;
+    if (caching) {
       if (commandInput.system) {
         (commandInput.system as unknown[]).push({ cachePoint: { type: 'default' } });
       }
-      if (tools) {
+      if (tools && caching.tools) {
         (tools.tools as unknown[]).push({ cachePoint: { type: 'default' } });
       }
       // Third cache point after the final message's content so the ENTIRE
@@ -448,6 +449,22 @@ function buildWireMessages(req: PromptRequest): unknown[] {
     });
   }
   return out;
+}
+
+/**
+ * Which Converse fields accept an explicit `cachePoint` for this model, or
+ * undefined if the model doesn't support explicit prompt caching at all.
+ * Per the Bedrock prompt-caching docs, Anthropic Claude models accept cache
+ * points in system, messages and tools; Amazon Nova only in system and
+ * messages (a cachePoint in toolConfig.tools is rejected as an extraneous
+ * key). Other models get none — they rely on implicit caching, if any.
+ * Matched by substring so cross-region profile IDs (`us.`, `global.`, ...)
+ * resolve to the underlying model.
+ */
+function cachePointSupport(model: string): { tools: boolean } | undefined {
+  if (model.includes('anthropic.claude')) return { tools: true };
+  if (model.includes('amazon.nova')) return { tools: false };
+  return undefined;
 }
 
 /**
