@@ -60,6 +60,16 @@ export async function* streamFromOpenAI(
      */
     includeCacheKey?: boolean;
     /**
+     * The endpoint is OpenRouter. With `req.cacheKey` set and an Anthropic
+     * model (`anthropic/...`), adds OpenRouter's top-level
+     * `cache_control: {type: 'ephemeral'}` ("automatic" prompt caching: it
+     * places the breakpoint on the last cacheable block and moves it forward
+     * as the conversation grows). Anthropic models ignore `prompt_cache_key`,
+     * so without this nothing is cached. Gated on OpenRouter because a strict
+     * OpenAI-compatible backend rejects the whole request on an unknown field.
+     */
+    openRouterAutoCache?: boolean;
+    /**
      * Optional adapter-supplied extractor that pulls vendor-specific
      * diagnostic data off the upstream HTTP response headers (request
      * id, rate-limit remaining, routing info, etc.) and returns it as
@@ -105,6 +115,9 @@ export async function* streamFromOpenAI(
   if (req.temperature !== undefined) body.temperature = req.temperature;
   if (req.cacheKey && options.includeCacheKey !== false) {
     (body as unknown as Record<string, unknown>).prompt_cache_key = req.cacheKey;
+  }
+  if (req.cacheKey && options.openRouterAutoCache && /^~?anthropic\//.test(req.model)) {
+    (body as unknown as Record<string, unknown>).cache_control = { type: 'ephemeral' };
   }
   const effectiveMaxTokens = req.maxTokens ?? options.defaultMaxTokens;
   if (effectiveMaxTokens !== undefined) {

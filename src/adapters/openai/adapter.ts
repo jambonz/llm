@@ -46,11 +46,14 @@ export class OpenAIAdapter implements LlmAdapter<ApiKeyAuth> {
   readonly acceptedAuth = ['apiKey'] as const;
 
   protected client: OpenAI | undefined;
+  /** baseURL is OpenRouter: enables its automatic prompt caching for Anthropic models. */
+  protected isOpenRouter = false;
 
   init(auth: ApiKeyAuth, client?: ClientOptions): void {
     if (!auth.apiKey) {
       throw new Error('OpenAIAdapter: apiKey is required');
     }
+    this.isOpenRouter = /(^|\/\/|\.)openrouter\.ai(\/|:|$)/i.test(auth.baseURL ?? '');
     this.client = new OpenAI({
       apiKey: auth.apiKey,
       ...(auth.baseURL ? { baseURL: auth.baseURL } : {}),
@@ -64,6 +67,7 @@ export class OpenAIAdapter implements LlmAdapter<ApiKeyAuth> {
       knownModels: this.knownModels(),
       vendorMetadataExtractor: OPENAI_METADATA_EXTRACTOR,
       includeCacheKey: this.forwardCacheKey(),
+      openRouterAutoCache: this.isOpenRouter,
     });
   }
 
