@@ -60,6 +60,19 @@ describe('normalizeAuth', () => {
     });
   });
 
+  describe('openrouter', () => {
+    it('maps api_key to ApiKeyAuth (no forced baseURL — adapter defaults to openrouter.ai)', () => {
+      expect(normalizeAuth('openrouter', { api_key: 'sk-or-v1-x' })).toEqual({
+        kind: 'apiKey',
+        apiKey: 'sk-or-v1-x',
+      });
+    });
+
+    it('throws when api_key is missing', () => {
+      expect(() => normalizeAuth('openrouter', {})).toThrowError(/requires 'api_key'/);
+    });
+  });
+
   describe('huggingface', () => {
     it('maps api_key to ApiKeyAuth (no forced baseURL — adapter defaults to router.huggingface.co)', () => {
       expect(normalizeAuth('huggingface', { api_key: 'hf_xyz' })).toEqual({

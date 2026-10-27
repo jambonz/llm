@@ -27,6 +27,7 @@ import { bedrockFactory } from './bedrock/index.js';
 import { azureOpenAIFactory } from './azure-openai/index.js';
 import { groqFactory } from './groq/index.js';
 import { huggingfaceFactory } from './huggingface/index.js';
+import { openRouterFactory } from './openrouter/index.js';
 
 registerAdapter(openAIFactory);
 registerAdapter(deepseekFactory);
@@ -43,3 +44,4 @@ registerAdapter(bedrockFactory);
 registerAdapter(azureOpenAIFactory);
 registerAdapter(groqFactory);
 registerAdapter(huggingfaceFactory);
+registerAdapter(openRouterFactory);
