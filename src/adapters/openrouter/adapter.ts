@@ -13,6 +13,17 @@ const OPENROUTER_METADATA_EXTRACTOR = makeMetadataExtractor([
   { header: 'x-generation-id', key: 'request_id' },
 ]);
 
+/**
+ * OpenRouter app attribution: credits this traffic to jambonz on
+ * OpenRouter's public app rankings and model pages. No effect on routing,
+ * pricing or rate limits. `HTTP-Referer` is the app's identity; the title
+ * is its display name.
+ */
+const OPENROUTER_ATTRIBUTION_HEADERS = {
+  'HTTP-Referer': 'https://jambonz.org',
+  'X-OpenRouter-Title': 'jambonz',
+};
+
 /** The subset of OpenRouter's `/models` entry this adapter reads. */
 interface OpenRouterModel {
   id: string;
@@ -31,6 +42,8 @@ interface OpenRouterModel {
  * handled by the base class, which detects the openrouter.ai baseURL (so it
  * also works for OpenAI credentials pointed at OpenRouter).
  *
+ * Every request carries jambonz's app-attribution headers.
+ *
  * Two overrides exist because OpenRouter's `/models` is public:
  *   - `testCredential()` probes the authenticated `/key` endpoint instead —
  *     `/models` returns 200 for any key, bogus or not.
@@ -48,6 +61,9 @@ export class OpenRouterAdapter extends OpenAIAdapter {
       },
       client,
     );
+    this.client = this.ensureClient().withOptions({
+      defaultHeaders: OPENROUTER_ATTRIBUTION_HEADERS,
+    });
   }
 
   override stream(req: PromptRequest): AsyncIterable<LlmEvent> {

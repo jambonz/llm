@@ -13,6 +13,7 @@ That works for streaming, but:
 - **Credential test.** OpenRouter's `/models` is public — it returns 200 for any key, so the OpenAI adapter's `models.list()` probe accepts a bogus key. This adapter probes `GET /key`, which returns 401 for a bad key.
 - **Model listing.** `/models` carries real capability metadata (`supported_parameters`, `architecture.input_modalities`, `context_length`); this adapter uses it instead of guessing by id, and drops `:batch` variants (async-only) and models that don't output text.
 - **Diagnostics.** `x-generation-id` is surfaced as `vendorMetadata.request_id` — the id OpenRouter support asks for.
+- **Attribution.** Every request sends `HTTP-Referer: https://jambonz.org` and `X-OpenRouter-Title: jambonz`, crediting the traffic to jambonz on OpenRouter's app rankings and model pages. It does not affect routing, pricing or rate limits.
 
 ## Prompt caching
 
@@ -25,4 +26,4 @@ That works for streaming, but:
 - Mid-stream failures arrive as a 200 SSE chunk with a top-level `error` and `finish_reason: "error"`; the shared streaming code throws on the top-level `error`.
 - The final usage chunk has a non-empty `choices` array repeating `finish_reason` — harmless.
 - OpenRouter adds a network hop in front of the upstream provider; expect somewhat higher TTFT than calling the provider directly.
-- Not exposed: provider routing (`provider`), fallback lists (`models`), plugins, and app-attribution headers (`HTTP-Referer`, `X-OpenRouter-Title`).
+- Provider routing (`provider`), fallback lists (`models`) and plugins are not set by the adapter; callers can send them through `req.providerParams`. Routing suffixes on the model id (`:nitro`, `:floor`) work as-is.

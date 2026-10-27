@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   modelsList: vi.fn(),
   get: vi.fn(),
+  withOptions: vi.fn(),
 }));
 
 vi.mock('openai', () => {
@@ -12,6 +13,10 @@ vi.mock('openai', () => {
     chat = { completions: { create: mocks.create } };
     models = { list: mocks.modelsList };
     get = mocks.get;
+    withOptions(opts: unknown) {
+      mocks.withOptions(opts);
+      return this;
+    }
     constructor(opts: unknown) {
       mocks.openaiConstructorSpy(opts);
     }
@@ -63,6 +68,16 @@ describe('OpenRouterAdapter — wire', () => {
     });
     const [opts] = mocks.openaiConstructorSpy.mock.calls[0]!;
     expect(opts.baseURL).toBe('https://my-proxy.example.com/openrouter/v1');
+  });
+
+  it('sends jambonz app-attribution headers on every request', async () => {
+    await createLlm({ vendor: 'openrouter', auth });
+    expect(mocks.withOptions).toHaveBeenCalledWith({
+      defaultHeaders: {
+        'HTTP-Referer': 'https://jambonz.org',
+        'X-OpenRouter-Title': 'jambonz',
+      },
+    });
   });
 
   it('reports vendor id as "openrouter" on the resulting adapter', async () => {

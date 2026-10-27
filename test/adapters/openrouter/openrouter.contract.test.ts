@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   modelsList: vi.fn(),
   get: vi.fn(),
+  withOptions: vi.fn(),
 }));
 
 vi.mock('openai', () => {
@@ -11,6 +12,10 @@ vi.mock('openai', () => {
     chat = { completions: { create: mocks.create } };
     models = { list: mocks.modelsList };
     get = mocks.get;
+    withOptions(opts: unknown) {
+      mocks.withOptions(opts);
+      return this;
+    }
     constructor(_opts: unknown) {
       // no-op
     }
