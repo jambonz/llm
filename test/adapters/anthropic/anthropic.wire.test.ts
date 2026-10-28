@@ -524,6 +524,47 @@ describe('Anthropic adapter — wire format', () => {
     });
   });
 
+  it('retries once without thinking when a replayed block is rejected', async () => {
+    mocks.create.mockResolvedValueOnce(mockStream(thinkingThenToolEvents()));
+    const adapter = await buildAdapter();
+    const first: PromptRequest = {
+      model: 'claude-haiku-5-5',
+      system: 'Be brief.',
+      messages: [{ role: 'user', content: 'hi' }],
+    };
+    const toolCalls = (await drain(adapter, first)).filter(
+      (e): e is Extract<LlmEvent, { type: 'toolCall' }> => e.type === 'toolCall',
+    );
+    let history = adapter.appendAssistantToolCall(first.messages, toolCalls, 'Let me check.');
+    history = adapter.appendToolResult(history, 'toolu_think', { status: 'Faulted' });
+
+    // The caller changed the system prompt, so the API rejects the block.
+    const rejection = Object.assign(
+      new Error('400 messages.1.content.0: Invalid `signature` in `thinking` block. The block is bound to a different conversation.'),
+      { status: 400 },
+    );
+    mocks.create.mockRejectedValueOnce(rejection);
+    mocks.create.mockResolvedValueOnce(mockStream(endTurnEvents()));
+    const events = await drain(adapter, { model: 'claude-haiku-5-5', system: 'Be very brief.', messages: history });
+
+    expect(events.at(-1)).toMatchObject({ type: 'end', finishReason: 'stop' });
+    expect(mocks.create).toHaveBeenCalledTimes(3);
+    const [retryBody] = mocks.create.mock.calls[2]!;
+    const assistantMsg = retryBody.messages.find((m: { role: string }) => m.role === 'assistant');
+    expect(assistantMsg.content.map((b: { type: string }) => b.type)).toEqual(['text', 'tool_use']);
+    // The caller's history keeps its blocks.
+    expect((history[1]!.vendorRaw as { content: unknown[] }).content).toHaveLength(4);
+  });
+
+  it('does not retry an unrelated 400', async () => {
+    mocks.create.mockRejectedValueOnce(Object.assign(new Error('400 max_tokens: too large'), { status: 400 }));
+    const adapter = await buildAdapter();
+    await expect(
+      drain(adapter, { model: 'claude-haiku-5-5', messages: [{ role: 'user', content: 'hi' }] }),
+    ).rejects.toThrowError(/max_tokens/);
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+  });
+
   it('drops a thinking block that never received its signature', async () => {
     mocks.create.mockResolvedValue(
       mockStream([

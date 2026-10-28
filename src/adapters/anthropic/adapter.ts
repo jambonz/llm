@@ -118,15 +118,13 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
       markLastMessageForCaching(messages);
     }
 
-    let stream;
-    let responseHeaders: Headers | undefined;
-    try {
-      // Production: `.withResponse()` on the Anthropic SDK's APIPromise
-      // exposes the underlying HTTP `Response` for header diagnostics.
-      // Test mocks return the stream directly with no APIPromise wrapper;
-      // fall through to plain await when `.withResponse` isn't present.
+    // Production: `.withResponse()` on the Anthropic SDK's APIPromise
+    // exposes the underlying HTTP `Response` for header diagnostics.
+    // Test mocks return the stream directly with no APIPromise wrapper;
+    // fall through to plain await when `.withResponse` isn't present.
+    const open = async (b: Record<string, unknown>) => {
       const apiPromise = client.messages.create(
-        body as unknown as Parameters<typeof client.messages.create>[0],
+        b as unknown as Parameters<typeof client.messages.create>[0],
         { signal: req.signal },
       );
       const maybeWithResponse = (apiPromise as unknown as {
@@ -137,11 +135,30 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
       }).withResponse;
       if (typeof maybeWithResponse === 'function') {
         const result = await maybeWithResponse.call(apiPromise);
-        stream = result.data;
-        responseHeaders = result.response?.headers;
-      } else {
-        stream = await apiPromise;
+        return { stream: result.data, headers: result.response?.headers };
       }
+      return { stream: await apiPromise, headers: undefined };
+    };
+
+    let stream;
+    let responseHeaders: Headers | undefined;
+    try {
+      let opened;
+      try {
+        opened = await open(body);
+      } catch (err) {
+        // A replayed thinking block is bound to the conversation prefix that
+        // produced it. Once the caller edits that prefix (a new system prompt,
+        // a different tool set, summarized history), accounts the API enforces
+        // this on get a 400 for every later request that replays the block.
+        // Retry once without thinking blocks: the turn runs without that
+        // reasoning, as it did before tool-call turns were replayed.
+        const stripped = isThinkingBlockRejection(err) ? withoutThinking(messages) : undefined;
+        if (!stripped) throw err;
+        opened = await open({ ...body, messages: stripped });
+      }
+      stream = opened.stream;
+      responseHeaders = opened.headers;
     } catch (err) {
       if (isAbortError(err)) {
         yield { type: 'end', finishReason: 'aborted' };
@@ -539,6 +556,32 @@ function markLastMessageForCaching(messages: unknown[]): void {
   }
   // Empty content (e.g. a bare assistant placeholder) is left unmarked —
   // an empty text block with cache_control would be rejected by the API.
+}
+
+/** A 400 that names a replayed `thinking` block (bound to an edited prefix, or an invalid signature). */
+function isThinkingBlockRejection(err: unknown): boolean {
+  const e = err as { status?: number; message?: unknown };
+  return e?.status === 400 && /`thinking` block/.test(String(e.message ?? ''));
+}
+
+/**
+ * Copy of the wire messages with every `thinking` / `redacted_thinking` block
+ * removed, or undefined when there were none. COPY, never mutate: the
+ * `vendorRaw` entries are the caller's history objects.
+ */
+function withoutThinking(messages: unknown[]): unknown[] | undefined {
+  let removed = false;
+  const out = messages.map((m) => {
+    const content = (m as { content?: unknown }).content;
+    if (!Array.isArray(content)) return m;
+    const kept = content.filter((b: { type?: string }) => {
+      const thinking = b?.type === 'thinking' || b?.type === 'redacted_thinking';
+      if (thinking) removed = true;
+      return !thinking;
+    });
+    return kept.length === content.length ? m : { ...(m as object), content: kept };
+  });
+  return removed ? out : undefined;
 }
 
 /**
