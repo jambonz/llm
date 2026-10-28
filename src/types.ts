@@ -331,6 +331,13 @@ export interface AdapterManifest {
   supportsModelListing: boolean;
   /** Optional documentation link for this vendor. */
   docsUrl?: string;
+  /**
+   * True for a vendor jambonz stores a credential for but that has no adapter
+   * in this library: `createLlm` and `getAdapterFactory` refuse it, it has no
+   * models and nothing may list them. The harness vendor is one: feature-server
+   * talks to the customer's harness over its own WebSocket protocol.
+   */
+  credentialOnly?: boolean;
 }
 
 export interface AuthKindSchema {

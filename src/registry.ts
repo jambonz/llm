@@ -10,6 +10,13 @@ import type { AdapterFactory, AdapterManifest, AuthSpec } from './types.js';
 const registry = new Map<string, AdapterFactory>();
 
 /**
+ * Vendors jambonz stores a credential for that have no adapter here
+ * (`manifest.credentialOnly`). They appear in `getManifest()` and
+ * `getVendorManifest()`, never in `getAdapterFactory()`.
+ */
+const credentialVendors = new Map<string, AdapterManifest>();
+
+/**
  * Register an adapter factory. Called once per adapter at module load.
  *
  * Throws if a factory is already registered for the same vendor id — this
@@ -19,7 +26,7 @@ const registry = new Map<string, AdapterFactory>();
  * (primarily useful in tests).
  */
 export function registerAdapter(factory: AdapterFactory): void {
-  if (registry.has(factory.vendor)) {
+  if (registry.has(factory.vendor) || credentialVendors.has(factory.vendor)) {
     throw new Error(
       `Adapter already registered for vendor '${factory.vendor}'. ` +
         `Use replaceAdapter() if you intended to override.`,
@@ -32,6 +39,20 @@ export function registerAdapter(factory: AdapterFactory): void {
     );
   }
   registry.set(factory.vendor, factory);
+}
+
+/**
+ * Register a credential-only vendor: a manifest with no adapter. Throws if
+ * the id is already taken or the manifest is not marked `credentialOnly`.
+ */
+export function registerCredentialVendor(manifest: AdapterManifest): void {
+  if (!manifest.credentialOnly) {
+    throw new Error(`Vendor '${manifest.vendor}' manifest is not marked credentialOnly.`);
+  }
+  if (registry.has(manifest.vendor) || credentialVendors.has(manifest.vendor)) {
+    throw new Error(`Vendor '${manifest.vendor}' is already registered.`);
+  }
+  credentialVendors.set(manifest.vendor, manifest);
 }
 
 /**
@@ -56,6 +77,11 @@ export function getAdapterFactory<A extends AuthSpec = AuthSpec>(
 ): AdapterFactory<A> {
   const factory = registry.get(vendor);
   if (!factory) {
+    if (credentialVendors.has(vendor)) {
+      throw new Error(
+        `Vendor '${vendor}' is credential-only: @jambonz/llm has no adapter for it.`,
+      );
+    }
     const known = Array.from(registry.keys()).sort().join(', ') || '(none)';
     throw new Error(
       `Unknown vendor '${vendor}'. Registered vendors: ${known}`,
@@ -65,19 +91,37 @@ export function getAdapterFactory<A extends AuthSpec = AuthSpec>(
 }
 
 /**
- * List all registered vendor ids, sorted alphabetically.
+ * Get the manifest for any registered vendor, adapter-backed or
+ * credential-only. Throws if unknown vendor. Use this (not
+ * `getAdapterFactory`) where only the credential shape matters.
+ */
+export function getVendorManifest(vendor: string): AdapterManifest {
+  const manifest = registry.get(vendor)?.manifest ?? credentialVendors.get(vendor);
+  if (!manifest) {
+    const known =
+      [...registry.keys(), ...credentialVendors.keys()].sort().join(', ') || '(none)';
+    throw new Error(`Unknown vendor '${vendor}'. Registered vendors: ${known}`);
+  }
+  return manifest;
+}
+
+/**
+ * List all registered adapter vendor ids, sorted alphabetically.
+ * Credential-only vendors are not included: they cannot be passed to `createLlm`.
  */
 export function listVendors(): string[] {
   return Array.from(registry.keys()).sort();
 }
 
 /**
- * Return an aggregated manifest for all registered adapters. Used by
- * api-server's /llm-vendors/manifest endpoint.
+ * Return an aggregated manifest for all registered vendors, credential-only
+ * ones included. Used by api-server's /llm-vendors/manifest endpoint.
  */
 export function getManifest(): { vendors: AdapterManifest[] } {
-  const vendors = Array.from(registry.values())
-    .map((f) => f.manifest)
+  const vendors = [
+    ...Array.from(registry.values()).map((f) => f.manifest),
+    ...credentialVendors.values(),
+  ]
     .sort((a, b) => a.vendor.localeCompare(b.vendor));
   return { vendors };
 }
@@ -88,4 +132,5 @@ export function getManifest(): { vendors: AdapterManifest[] } {
  */
 export function _resetRegistryForTests(): void {
   registry.clear();
+  credentialVendors.clear();
 }

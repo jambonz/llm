@@ -174,3 +174,12 @@ Here's what the kit verifies. Knowing this in advance helps you design your adap
 - **Tool-call id synthesis**. Some vendors (Google Gemini) don't give tool calls a stable id. Synthesize one (e.g., `${name}_${Date.now()}_${counter}`) and use it consistently in `appendToolResult`.
 - **Fragmented tool-call deltas**. OpenAI streams tool-call arguments as a sequence of string deltas. Accumulate inside the adapter; emit `toolCall` once.
 - **Model capability tables.** `max_completion_tokens` vs `max_tokens`, which models support tools, which support vision — the vendor won't tell you automatically. Maintain a lookup or emit warnings for unknown models.
+
+## Credential-only vendors
+
+Some vendors jambonz stores a credential for are not LLM APIs this library talks to. The harness vendor
+(`src/vendors/harness.ts`) is the example: feature-server speaks the harness WebSocket protocol itself. Such a vendor is
+a manifest with `credentialOnly: true`, registered with `registerCredentialVendor` in `src/adapters/index.ts`. It
+appears in `getManifest()` and `getVendorManifest()` (so api-server can validate and store it and the portal can render
+its form) and works with `pickAuthKind`, but `getAdapterFactory`, `createLlm` and `normalizeAuth` refuse it, and
+`listVendors()` leaves it out. It has no models.
