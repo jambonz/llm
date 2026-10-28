@@ -9,7 +9,7 @@
  * for contributors to copy, not a live adapter.
  */
 
-import { registerAdapter } from '../registry.js';
+import { registerAdapter, registerCredentialVendor } from '../registry.js';
 import {
   openAIFactory,
   deepseekFactory,
@@ -28,6 +28,7 @@ import { azureOpenAIFactory } from './azure-openai/index.js';
 import { groqFactory } from './groq/index.js';
 import { huggingfaceFactory } from './huggingface/index.js';
 import { openRouterFactory } from './openrouter/index.js';
+import { harnessManifest } from '../vendors/harness.js';
 
 registerAdapter(openAIFactory);
 registerAdapter(deepseekFactory);
@@ -45,3 +46,7 @@ registerAdapter(azureOpenAIFactory);
 registerAdapter(groqFactory);
 registerAdapter(huggingfaceFactory);
 registerAdapter(openRouterFactory);
+
+// Credential-only vendors: a manifest for credential storage and the portal
+// form, no adapter (see src/vendors/).
+registerCredentialVendor(harnessManifest);

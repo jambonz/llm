@@ -7,6 +7,8 @@
  * Consumers use:
  *   - `createLlm({vendor, auth, client?})` to get a ready-to-stream adapter instance.
  *   - `getManifest()` to enumerate registered vendors (used by api-server).
+ *   - `getVendorManifest(vendor)` for one vendor's manifest, including
+ *     credential-only vendors (e.g. `harness`) that have no adapter.
  *   - `normalizeAuth(vendor, rawCred)` to convert DB-shape creds to AuthSpec.
  *   - `pickAuthKind(vendor, rawCred)` to pick the right manifest authKind for
  *     a raw credential (used by api-server's `encryptCredential`).
@@ -84,6 +86,7 @@ export { assertValidRequest } from './validate.js';
 export {
   getAdapterFactory,
   getManifest,
+  getVendorManifest,
   listVendors,
   registerAdapter,
   replaceAdapter,

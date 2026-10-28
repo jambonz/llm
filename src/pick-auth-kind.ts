@@ -1,5 +1,5 @@
 import type { RawCredential } from './normalize-auth.js';
-import { getAdapterFactory } from './registry.js';
+import { getVendorManifest } from './registry.js';
 import type { AuthKindSchema } from './types.js';
 
 /**
@@ -24,8 +24,7 @@ export interface RawCredentialLoose extends RawCredential {
 }
 
 export function pickAuthKind(vendor: string, raw: RawCredentialLoose): AuthKindSchema {
-  const factory = getAdapterFactory(vendor);
-  const { authKinds } = factory.manifest;
+  const { authKinds } = getVendorManifest(vendor);
 
   if (authKinds.length === 1) {
     return authKinds[0]!;
