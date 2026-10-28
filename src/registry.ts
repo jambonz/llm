@@ -122,6 +122,7 @@ export function getManifest(): { vendors: AdapterManifest[] } {
     ...Array.from(registry.values()).map((f) => f.manifest),
     ...credentialVendors.values(),
   ]
+    .map((m) => ({ ...m, category: m.category ?? 'llm' }))
     .sort((a, b) => a.vendor.localeCompare(b.vendor));
   return { vendors };
 }
