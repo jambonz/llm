@@ -29,6 +29,8 @@ import { groqFactory } from './groq/index.js';
 import { huggingfaceFactory } from './huggingface/index.js';
 import { openRouterFactory } from './openrouter/index.js';
 import { harnessManifest } from '../vendors/harness.js';
+import { dialogflowCesManifest } from '../vendors/dialogflow-ces.js';
+import { openaiS2sManifest } from '../vendors/openai-s2s.js';
 
 registerAdapter(openAIFactory);
 registerAdapter(deepseekFactory);
@@ -50,3 +52,5 @@ registerAdapter(openRouterFactory);
 // Credential-only vendors: a manifest for credential storage and the portal
 // form, no adapter (see src/vendors/).
 registerCredentialVendor(harnessManifest);
+registerCredentialVendor(openaiS2sManifest);
+registerCredentialVendor(dialogflowCesManifest);

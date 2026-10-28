@@ -45,6 +45,7 @@ export async function createLlm<A extends AuthSpec = AuthSpec>(
 export type {
   AdapterFactory,
   AdapterManifest,
+  VendorCategory,
   ApiKeyAuth,
   AuthKind,
   AuthKindSchema,

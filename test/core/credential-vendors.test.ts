@@ -66,3 +66,37 @@ describe('credential-only vendors (harness)', () => {
     ).toThrow(/already registered/);
   });
 });
+
+describe('vendor categories', () => {
+  it('every vendor in the manifest has a category; language models default to llm', () => {
+    const vendors = getManifest().vendors;
+    expect(vendors.every((v) => ['llm', 's2s', 'hosted'].includes(v.category!))).toBe(true);
+    const cat = (id: string) => vendors.find((v) => v.vendor === id)?.category;
+    expect([cat('openai'), cat('harness'), cat('openai_s2s'), cat('dialogflow_ces')]).toEqual([
+      'llm',
+      'llm',
+      's2s',
+      'hosted',
+    ]);
+  });
+
+  it('openai_s2s is credential-only with one required secret key', () => {
+    const m = getVendorManifest('openai_s2s');
+    expect(m.credentialOnly).toBe(true);
+    expect(m.authKinds[0]!.fields.map((f) => [f.name, f.type, f.required])).toEqual([
+      ['apiKey', 'password', true],
+    ]);
+    expect(() => getAdapterFactory('openai_s2s')).toThrow(/credential-only/);
+    expect(listVendors()).not.toContain('openai_s2s');
+  });
+
+  it('dialogflow_ces is credential-only with a service-account key file', () => {
+    const m = getVendorManifest('dialogflow_ces');
+    expect(m.credentialOnly).toBe(true);
+    expect(m.authKinds[0]!.fields.map((f) => [f.name, f.type, f.required])).toEqual([
+      ['credentials', 'json-file', true],
+    ]);
+    expect(pickAuthKind('dialogflow_ces', { service_key: '{}' }).kind).toBe('googleServiceAccount');
+    expect(() => normalizeAuth('dialogflow_ces', { service_key: '{}' })).toThrow(/unknown vendor/);
+  });
+});

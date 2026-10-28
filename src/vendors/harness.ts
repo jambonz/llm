@@ -40,4 +40,5 @@ export const harnessManifest: AdapterManifest = {
   knownModels: [],
   supportsModelListing: false,
   credentialOnly: true,
+  category: 'llm',
 };

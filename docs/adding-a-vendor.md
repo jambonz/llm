@@ -183,3 +183,8 @@ a manifest with `credentialOnly: true`, registered with `registerCredentialVendo
 appears in `getManifest()` and `getVendorManifest()` (so api-server can validate and store it and the portal can render
 its form) and works with `pickAuthKind`, but `getAdapterFactory`, `createLlm` and `normalizeAuth` refuse it, and
 `listVendors()` leaves it out. It has no models.
+
+Every manifest has a `category` that decides where the portal lists the credential: `llm` (the default, a language
+model for the agent verb; the harness is one too), `s2s` (a speech-to-speech model for the llm verb, with the schema's
+verb name as its id, e.g. `openai_s2s`) or `hosted` (an agent run at the vendor, e.g. `dialogflow_ces` for the
+dialogflow verb). A credential for one category is never used for another, even when the vendor accepts the same key.

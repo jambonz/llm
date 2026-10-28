@@ -338,7 +338,19 @@ export interface AdapterManifest {
    * talks to the customer's harness over its own WebSocket protocol.
    */
   credentialOnly?: boolean;
+  /**
+   * What a credential for this vendor is used for, which decides where the
+   * portal lists it. Absent means `llm`; `getManifest()` fills it in.
+   */
+  category?: VendorCategory;
 }
+
+/**
+ * - `llm`: a language model behind the agent verb (and the harness, which takes its place).
+ * - `s2s`: a speech-to-speech model for the llm verb. Ids are the schema's verb names (`openai_s2s`).
+ * - `hosted`: an agent defined and run at the vendor, e.g. Dialogflow CES for the dialogflow verb.
+ */
+export type VendorCategory = 'llm' | 's2s' | 'hosted';
 
 export interface AuthKindSchema {
   kind: AuthKind;
