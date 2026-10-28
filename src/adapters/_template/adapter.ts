@@ -50,7 +50,9 @@ export class TemplateAdapter implements LlmAdapter<ApiKeyAuth> {
     //   - Optional `{type: 'toolCallStart', id, name}` when a tool call begins
     //     (emit this as soon as the vendor surfaces the name).
     //   - Zero or more `{type: 'toolCall', id, name, arguments}` events — each
-    //     emitted ONCE with fully-accumulated arguments.
+    //     emitted ONCE with fully-accumulated arguments. Add `vendorRaw` for
+    //     state you need back in appendAssistantToolCall; callers pass the
+    //     event through unchanged.
     //   - Exactly one `{type: 'end', finishReason, usage?}` as the LAST event.
     //
     // On abort (req.signal?.aborted), yield {type: 'end', finishReason: 'aborted'}

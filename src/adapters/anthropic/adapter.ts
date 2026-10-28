@@ -28,6 +28,15 @@ const ANTHROPIC_METADATA_EXTRACTOR = makeMetadataExtractor([
 ]);
 
 /**
+ * Models that return 400 on any non-default sampling parameter. Opus 4.7
+ * dropped `temperature` / `top_p` / `top_k`, and every Claude model since
+ * (Opus 4.8 and 5.x, Sonnet 5.x, Haiku 5.5, Fable, Mythos) does the same.
+ * `temperature` is left out of their requests: a value the model cannot
+ * honor is not worth failing every call over.
+ */
+const REJECTS_SAMPLING_PARAMS = /^claude-(opus-4-[7-9]|opus-5|sonnet-5|haiku-5|fable|mythos)/;
+
+/**
  * Adapter for Anthropic Claude.
  *
  * Key wire-shape differences from OpenAI:
@@ -78,7 +87,19 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
     };
     if (req.system) body.system = req.system;
     if (tools) body.tools = tools;
-    if (req.temperature !== undefined) body.temperature = req.temperature;
+    if (req.temperature !== undefined && !REJECTS_SAMPLING_PARAMS.test(req.model)) {
+      body.temperature = req.temperature;
+    }
+
+    // Merge caller-supplied provider-specific params (e.g. Claude's
+    // `output_config: {effort}` or `thinking`). Add-only: never overwrite a
+    // library-managed field, so this can extend the request but not corrupt
+    // its core shape.
+    if (req.providerParams) {
+      for (const [key, value] of Object.entries(req.providerParams)) {
+        if (!(key in body)) body[key] = value;
+      }
+    }
 
     if (req.cacheKey) {
       if (req.system) {
@@ -97,15 +118,13 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
       markLastMessageForCaching(messages);
     }
 
-    let stream;
-    let responseHeaders: Headers | undefined;
-    try {
-      // Production: `.withResponse()` on the Anthropic SDK's APIPromise
-      // exposes the underlying HTTP `Response` for header diagnostics.
-      // Test mocks return the stream directly with no APIPromise wrapper;
-      // fall through to plain await when `.withResponse` isn't present.
+    // Production: `.withResponse()` on the Anthropic SDK's APIPromise
+    // exposes the underlying HTTP `Response` for header diagnostics.
+    // Test mocks return the stream directly with no APIPromise wrapper;
+    // fall through to plain await when `.withResponse` isn't present.
+    const open = async (b: Record<string, unknown>) => {
       const apiPromise = client.messages.create(
-        body as unknown as Parameters<typeof client.messages.create>[0],
+        b as unknown as Parameters<typeof client.messages.create>[0],
         { signal: req.signal },
       );
       const maybeWithResponse = (apiPromise as unknown as {
@@ -116,11 +135,30 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
       }).withResponse;
       if (typeof maybeWithResponse === 'function') {
         const result = await maybeWithResponse.call(apiPromise);
-        stream = result.data;
-        responseHeaders = result.response?.headers;
-      } else {
-        stream = await apiPromise;
+        return { stream: result.data, headers: result.response?.headers };
       }
+      return { stream: await apiPromise, headers: undefined };
+    };
+
+    let stream;
+    let responseHeaders: Headers | undefined;
+    try {
+      let opened;
+      try {
+        opened = await open(body);
+      } catch (err) {
+        // A replayed thinking block is bound to the conversation prefix that
+        // produced it. Once the caller edits that prefix (a new system prompt,
+        // a different tool set, summarized history), accounts the API enforces
+        // this on get a 400 for every later request that replays the block.
+        // Retry once without thinking blocks: the turn runs without that
+        // reasoning, as it did before tool-call turns were replayed.
+        const stripped = isThinkingBlockRejection(err) ? withoutThinking(messages) : undefined;
+        if (!stripped) throw err;
+        opened = await open({ ...body, messages: stripped });
+      }
+      stream = opened.stream;
+      responseHeaders = opened.headers;
     } catch (err) {
       if (isAbortError(err)) {
         yield { type: 'end', finishReason: 'aborted' };
@@ -130,7 +168,12 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
     }
 
     let currentToolUse: PendingToolUse | null = null;
+    let currentThinking: ThinkingBlock | null = null;
+    let currentText: string | null = null;
     const completedToolCalls: CompletedToolCall[] = [];
+    // The turn's content blocks in the order the model produced them, so a
+    // tool-call turn can be replayed as written (see appendAssistantToolCall).
+    const turnContent: AssistantBlock[] = [];
     let stopReason: string | undefined;
     let inputTokens: number | undefined;
     let outputTokens: number | undefined;
@@ -169,6 +212,16 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
                   name: currentToolUse.name,
                 };
               }
+            } else if (block?.type === 'text') {
+              currentText = block.text ?? '';
+            } else if (block?.type === 'thinking') {
+              currentThinking = {
+                type: 'thinking',
+                thinking: block.thinking ?? '',
+                signature: block.signature ?? '',
+              };
+            } else if (block?.type === 'redacted_thinking' && block.data) {
+              turnContent.push({ type: 'redacted_thinking', data: block.data });
             }
             break;
           }
@@ -176,14 +229,31 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
           case 'content_block_delta': {
             const delta = event.delta;
             if (delta?.type === 'text_delta' && delta.text) {
+              if (currentText !== null) currentText += delta.text;
               yield { type: 'token', text: delta.text };
             } else if (delta?.type === 'input_json_delta' && currentToolUse && delta.partial_json) {
               currentToolUse.argumentsText += delta.partial_json;
+            } else if (delta?.type === 'thinking_delta' && currentThinking && delta.thinking) {
+              currentThinking.thinking += delta.thinking;
+            } else if (delta?.type === 'signature_delta' && currentThinking && delta.signature) {
+              currentThinking.signature += delta.signature;
             }
             break;
           }
 
           case 'content_block_stop':
+            // Close whichever block is open and record it in turn order. An
+            // unsigned thinking block is dropped: the API rejects a replayed
+            // one without its signature. (Haiku 5.5 omits the thinking text
+            // by default, so an empty `thinking` with a signature is kept.)
+            if (currentThinking) {
+              if (currentThinking.signature) turnContent.push(currentThinking);
+              currentThinking = null;
+            }
+            if (currentText !== null) {
+              if (currentText) turnContent.push({ type: 'text', text: currentText });
+              currentText = null;
+            }
             if (currentToolUse && currentToolUse.id && currentToolUse.name) {
               let parsed: unknown = {};
               try {
@@ -197,6 +267,12 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
                 id: currentToolUse.id,
                 name: currentToolUse.name,
                 arguments: parsed,
+              });
+              turnContent.push({
+                type: 'tool_use',
+                id: currentToolUse.id,
+                name: currentToolUse.name,
+                input: parsed,
               });
             }
             currentToolUse = null;
@@ -233,13 +309,17 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
       return;
     }
 
-    // Emit accumulated tool calls before the end event.
+    // Emit accumulated tool calls before the end event. Each carries the
+    // whole turn as the model wrote it, so appendAssistantToolCall can replay
+    // it whichever of the calls the caller passes back.
+    const toolCallRaw: AnthropicToolCallRaw = { content: turnContent };
     for (const tc of completedToolCalls) {
       yield {
         type: 'toolCall',
         id: tc.id,
         name: tc.name,
         arguments: tc.arguments,
+        vendorRaw: toolCallRaw,
       };
     }
 
@@ -288,15 +368,7 @@ export class AnthropicAdapter implements LlmAdapter<ApiKeyAuth> {
     const text = assistantText?.trim() ? assistantText : null;
     const wireMessage = {
       role: 'assistant',
-      content: [
-        ...(text ? [{ type: 'text', text }] : []),
-        ...toolCalls.map((tc) => ({
-          type: 'tool_use',
-          id: tc.id,
-          name: tc.name,
-          input: tc.arguments ?? {},
-        })),
-      ],
+      content: assistantTurnContent(toolCalls, text),
     };
     return [
       ...history,
@@ -383,6 +455,37 @@ interface CompletedToolCall {
   arguments: unknown;
 }
 
+interface ThinkingBlock {
+  type: 'thinking';
+  thinking: string;
+  signature: string;
+}
+
+interface RedactedThinkingBlock {
+  type: 'redacted_thinking';
+  data: string;
+}
+
+interface TextBlock {
+  type: 'text';
+  text: string;
+}
+
+interface ToolUseBlock {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+type AssistantBlock = ThinkingBlock | RedactedThinkingBlock | TextBlock | ToolUseBlock;
+
+/** Shape of `vendorRaw` on the toolCall events this adapter emits. */
+interface AnthropicToolCallRaw {
+  /** The assistant turn's content blocks, in the order the model produced them. */
+  content: AssistantBlock[];
+}
+
 interface AnthropicStreamEvent {
   type: string;
   message?: {
@@ -392,11 +495,21 @@ interface AnthropicStreamEvent {
       cache_creation_input_tokens?: number;
     };
   };
-  content_block?: { type?: string; id?: string; name?: string };
+  content_block?: {
+    type?: string;
+    id?: string;
+    name?: string;
+    text?: string;
+    thinking?: string;
+    signature?: string;
+    data?: string;
+  };
   delta?: {
     type?: string;
     text?: string;
     partial_json?: string;
+    thinking?: string;
+    signature?: string;
     stop_reason?: string;
   };
   usage?: { output_tokens?: number };
@@ -445,6 +558,95 @@ function markLastMessageForCaching(messages: unknown[]): void {
   // an empty text block with cache_control would be rejected by the API.
 }
 
+/** A 400 that names a replayed `thinking` block (bound to an edited prefix, or an invalid signature). */
+function isThinkingBlockRejection(err: unknown): boolean {
+  const e = err as { status?: number; message?: unknown };
+  return e?.status === 400 && /`thinking` block/.test(String(e.message ?? ''));
+}
+
+/**
+ * Copy of the wire messages with every `thinking` / `redacted_thinking` block
+ * removed, or undefined when there were none. COPY, never mutate: the
+ * `vendorRaw` entries are the caller's history objects.
+ */
+function withoutThinking(messages: unknown[]): unknown[] | undefined {
+  let removed = false;
+  const out = messages.map((m) => {
+    const content = (m as { content?: unknown }).content;
+    if (!Array.isArray(content)) return m;
+    const kept = content.filter((b: { type?: string }) => {
+      const thinking = b?.type === 'thinking' || b?.type === 'redacted_thinking';
+      if (thinking) removed = true;
+      return !thinking;
+    });
+    return kept.length === content.length ? m : { ...(m as object), content: kept };
+  });
+  return removed ? out : undefined;
+}
+
+/**
+ * The content of an assistant tool-call turn, for the wire.
+ *
+ * Events from `stream()` carry the turn as the model wrote it (thinking,
+ * text and tool_use blocks in order) and that record is replayed: thinking
+ * blocks keep their place — dropped, the request still succeeds, but the
+ * model reasons the turn out again after the tool result — and so does text
+ * the model wrote between tool calls. Only the tool_use blocks the caller
+ * passed back stay in; `text` is added before the first tool call when the
+ * record has no text of its own. Events built by the caller carry no record,
+ * so the turn is rebuilt from the text and the call arguments.
+ */
+function assistantTurnContent(
+  toolCalls: ReadonlyArray<ToolCallEvent>,
+  text: string | null,
+): Array<Record<string, unknown>> {
+  const recorded = recordedTurnOf(toolCalls);
+  if (!recorded) {
+    return [
+      ...(text ? [{ type: 'text', text }] : []),
+      ...toolCalls.map((tc) => ({
+        type: 'tool_use',
+        id: tc.id,
+        name: tc.name,
+        input: tc.arguments ?? {},
+      })),
+    ];
+  }
+
+  const ids = new Set(toolCalls.map((tc) => tc.id));
+  const content: AssistantBlock[] = recorded.filter(
+    (b) => b.type !== 'tool_use' || ids.has(b.id),
+  );
+  if (text && !content.some((b) => b.type === 'text')) {
+    const at = content.findIndex((b) => b.type === 'tool_use');
+    content.splice(at === -1 ? content.length : at, 0, { type: 'text', text });
+  }
+  // A call the record does not know about (two turns' events passed
+  // together) still gets its tool_use block, or its result has no match.
+  const known = new Set(
+    content.flatMap((b) => (b.type === 'tool_use' ? [b.id] : [])),
+  );
+  for (const tc of toolCalls) {
+    if (!known.has(tc.id)) {
+      content.push({ type: 'tool_use', id: tc.id, name: tc.name, input: tc.arguments ?? {} });
+    }
+  }
+  return content as unknown as Array<Record<string, unknown>>;
+}
+
+/**
+ * The turn record `stream()` attached to a turn's toolCall events. Every call
+ * of the turn carries the same record, so the first one found is the whole
+ * turn; events built by the caller (no `vendorRaw`) have none.
+ */
+function recordedTurnOf(toolCalls: ReadonlyArray<ToolCallEvent>): AssistantBlock[] | undefined {
+  for (const tc of toolCalls) {
+    const raw = tc.vendorRaw as Partial<AnthropicToolCallRaw> | undefined;
+    if (raw && Array.isArray(raw.content)) return raw.content;
+  }
+  return undefined;
+}
+
 function formatTools(tools: Tool[]): Array<Record<string, unknown>> {
   return tools.map((t) => ({
     name: t.name,
@@ -463,6 +665,8 @@ function mapStopReason(r: string | undefined, hadToolCalls: boolean): FinishReas
       return 'tool';
     case 'max_tokens':
       return 'length';
+    case 'refusal':
+      return 'filtered';
     default:
       return 'stop';
   }

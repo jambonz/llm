@@ -77,12 +77,16 @@ export interface PromptRequest {
   maxTokens?: number;
   /**
    * Provider-specific request-body parameters merged verbatim into the
-   * outgoing request by OpenAI-compatible adapters. Opt-in escape hatch for
-   * fields the typed interface does not model — e.g. a vLLM/Mantle-served
-   * Kimi endpoint's `{chat_template_kwargs: {enable_thinking: false}}` to
-   * suppress chain-of-thought. Never sent unless set. Keys that collide with
-   * library-managed fields (model, messages, stream, tools, …) are ignored,
-   * so this can only add parameters, never override core request shape.
+   * outgoing request by OpenAI-compatible adapters and the Anthropic adapter
+   * (the Gemini adapters merge them into the generation config). Opt-in
+   * escape hatch for fields the typed interface does not model — e.g. a
+   * vLLM/Mantle-served Kimi endpoint's
+   * `{chat_template_kwargs: {enable_thinking: false}}` to suppress
+   * chain-of-thought, or Claude's `{output_config: {effort: 'low'}}` to cap
+   * how much it thinks before answering. Never sent unless set. Keys that
+   * collide with library-managed fields (model, messages, stream, tools, …)
+   * are ignored, so this can only add parameters, never override core
+   * request shape.
    */
   providerParams?: Record<string, unknown>;
   /** Abort the stream. Adapters MUST honor this and propagate to the vendor SDK. */
@@ -110,7 +114,22 @@ export interface PromptRequest {
 export type LlmEvent =
   | { type: 'token'; text: string }
   | { type: 'toolCallStart'; id: string; name: string }
-  | { type: 'toolCall'; id: string; name: string; arguments: unknown }
+  | {
+      type: 'toolCall';
+      id: string;
+      name: string;
+      arguments: unknown;
+      /**
+       * Opaque vendor-native state the adapter needs back when the call is
+       * written into history: pass the event to `appendAssistantToolCall`
+       * unchanged. Anthropic records the turn's content blocks here
+       * (`thinking`, `redacted_thinking`, text and `tool_use`, in order) and
+       * replays them, so the model keeps its reasoning after the tool result
+       * instead of working the turn out again. Absent unless the adapter
+       * set it.
+       */
+      vendorRaw?: unknown;
+    }
   | {
       type: 'end';
       finishReason: FinishReason;

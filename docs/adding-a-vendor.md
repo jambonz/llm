@@ -67,7 +67,7 @@ This is the core of the adapter. Contract:
 
 - Zero or more `{type: 'token', text}` events for content deltas.
 - Optional `{type: 'toolCallStart', id, name}` when a tool call begins (emit as soon as the vendor surfaces the name — helps voice callers say filler audio while arguments still stream).
-- Zero or more `{type: 'toolCall', id, name, arguments}` events, each emitted ONCE with fully-accumulated arguments.
+- Zero or more `{type: 'toolCall', id, name, arguments}` events, each emitted ONCE with fully-accumulated arguments. An adapter may add `vendorRaw` — state it needs back when the call is written into history (Anthropic records the turn's content blocks there); callers pass the event to `appendAssistantToolCall` unchanged.
 - Exactly one `{type: 'end', finishReason, usage?}` as the LAST event.
 
 Always call `assertValidRequest(req)` from `src/validate.js` at the top — it enforces the library's standard preconditions (non-empty messages, no `role: 'system'` in messages, non-empty model).
@@ -80,7 +80,7 @@ Tool-call argument deltas are often streamed fragmented by vendors (OpenAI in pa
 
 These two helpers let stateful callers (e.g. a voice agent maintaining a running history across turns) append the two halves of a tool-call round-trip in your vendor's native shape:
 
-- `appendAssistantToolCall(history, toolCalls)` — called after `stream()` yields one or more `toolCall` events. Returns a new history with an **assistant turn** that carries the tool calls in whatever wire shape the vendor expects (OpenAI's `tool_calls` array, Anthropic's `content: [{type:'tool_use',...}]` blocks, Gemini's `parts: [{functionCall,...}]`, Bedrock's `content: [{toolUse: ...}]`, etc.).
+- `appendAssistantToolCall(history, toolCalls)` — called after `stream()` yields one or more `toolCall` events. Returns a new history with an **assistant turn** that carries the tool calls in whatever wire shape the vendor expects (OpenAI's `tool_calls` array, Anthropic's `content: [{type:'tool_use',...}]` blocks, Gemini's `parts: [{functionCall,...}]`, Bedrock's `content: [{toolUse: ...}]`, etc.). It receives the `toolCall` events from `stream()` as they were emitted, so anything the adapter put in their `vendorRaw` is available here.
 - `appendToolResult(history, toolCallId, result)` — called after the caller has executed the tool. Appends a **tool-result message** in the vendor's native shape. The returned array MUST be a valid `messages` input for a subsequent `stream()` call on the same adapter.
 
 The `vendorRaw` field on Message is an opaque wire shape — use it to preserve vendor-native details. When the adapter sees `vendorRaw` on an assistant or tool message in a subsequent request, use it as the source of truth rather than re-constructing from the normalized fields.

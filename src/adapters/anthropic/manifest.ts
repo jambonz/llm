@@ -33,6 +33,21 @@ const ANTHROPIC_KNOWN_MODELS: ModelInfo[] = [
     },
   },
   {
+    // Thinks by default (effort `medium`), and the thinking counts toward
+    // max_tokens. For voice, send `providerParams: {output_config: {effort:
+    // 'low'}}`. Rejects non-default sampling parameters, so the adapter
+    // leaves `temperature` out of its requests.
+    id: 'claude-haiku-5-5',
+    displayName: 'Claude Haiku 5.5',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true,
+      systemPrompt: true,
+      maxContextTokens: 1_000_000,
+    },
+  },
+  {
     id: 'claude-haiku-4-5-20251001',
     displayName: 'Claude Haiku 4.5',
     capabilities: {
