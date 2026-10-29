@@ -112,6 +112,17 @@ describe('vendor categories', () => {
     expect(listVendors()).not.toContain('gptlive_s2s');
   });
 
+  it('ultravox_s2s is a credential-only speech-to-speech vendor with one required secret key', () => {
+    const m = getVendorManifest('ultravox_s2s');
+    expect(m.credentialOnly).toBe(true);
+    expect(m.category).toBe('s2s');
+    expect(m.authKinds[0]!.fields.map((f) => [f.name, f.type, f.required])).toEqual([
+      ['apiKey', 'password', true],
+    ]);
+    expect(() => getAdapterFactory('ultravox_s2s')).toThrow(/credential-only/);
+    expect(listVendors()).not.toContain('ultravox_s2s');
+  });
+
   it('dialogflow_ces is credential-only with a service-account key file', () => {
     const m = getVendorManifest('dialogflow_ces');
     expect(m.credentialOnly).toBe(true);
