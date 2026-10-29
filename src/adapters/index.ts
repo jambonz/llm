@@ -34,6 +34,8 @@ import { openaiS2sManifest } from '../vendors/openai-s2s.js';
 import { rimeS2sManifest } from '../vendors/rime-s2s.js';
 import { gptliveS2sManifest } from '../vendors/gptlive-s2s.js';
 import { ultravoxS2sManifest } from '../vendors/ultravox-s2s.js';
+import { deepgramS2sManifest } from '../vendors/deepgram-s2s.js';
+import { elevenlabsS2sManifest } from '../vendors/elevenlabs-s2s.js';
 
 registerAdapter(openAIFactory);
 registerAdapter(deepseekFactory);
@@ -59,4 +61,6 @@ registerCredentialVendor(openaiS2sManifest);
 registerCredentialVendor(rimeS2sManifest);
 registerCredentialVendor(gptliveS2sManifest);
 registerCredentialVendor(ultravoxS2sManifest);
+registerCredentialVendor(deepgramS2sManifest);
+registerCredentialVendor(elevenlabsS2sManifest);
 registerCredentialVendor(dialogflowCesManifest);

@@ -123,6 +123,20 @@ describe('vendor categories', () => {
     expect(listVendors()).not.toContain('ultravox_s2s');
   });
 
+  it.each(['deepgram_s2s', 'elevenlabs_s2s'])(
+    '%s is a credential-only speech-to-speech vendor with one required secret key',
+    (vendor) => {
+      const m = getVendorManifest(vendor);
+      expect(m.credentialOnly).toBe(true);
+      expect(m.category).toBe('s2s');
+      expect(m.authKinds[0]!.fields.map((f) => [f.name, f.type, f.required])).toEqual([
+        ['apiKey', 'password', true],
+      ]);
+      expect(() => getAdapterFactory(vendor)).toThrow(/credential-only/);
+      expect(listVendors()).not.toContain(vendor);
+    },
+  );
+
   it('dialogflow_ces is credential-only with a service-account key file', () => {
     const m = getVendorManifest('dialogflow_ces');
     expect(m.credentialOnly).toBe(true);
