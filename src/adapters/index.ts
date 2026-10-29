@@ -32,6 +32,7 @@ import { harnessManifest } from '../vendors/harness.js';
 import { dialogflowCesManifest } from '../vendors/dialogflow-ces.js';
 import { openaiS2sManifest } from '../vendors/openai-s2s.js';
 import { rimeS2sManifest } from '../vendors/rime-s2s.js';
+import { gptliveS2sManifest } from '../vendors/gptlive-s2s.js';
 
 registerAdapter(openAIFactory);
 registerAdapter(deepseekFactory);
@@ -55,4 +56,5 @@ registerAdapter(openRouterFactory);
 registerCredentialVendor(harnessManifest);
 registerCredentialVendor(openaiS2sManifest);
 registerCredentialVendor(rimeS2sManifest);
+registerCredentialVendor(gptliveS2sManifest);
 registerCredentialVendor(dialogflowCesManifest);
