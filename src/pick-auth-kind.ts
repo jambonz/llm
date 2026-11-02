@@ -16,6 +16,7 @@ import type { AuthKindSchema } from './types.js';
  *   - Vendor with a single `authKind`: that kind is returned unconditionally.
  *   - Bedrock: `access_key_id` + `secret_access_key` → `bedrockIam`; else `bedrockApiKey`.
  *   - Google: `service_key` present → `googleServiceAccount`; `api_key` present → `googleApiKey`.
+ *   - google_s2s: `service_key` present → `vertexServiceAccount`; `api_key` present → `googleApiKey`.
  *
  * Throws if the vendor is unknown or if no declared authKind matches the blob.
  */
@@ -61,6 +62,16 @@ export function pickAuthKind(vendor: string, raw: RawCredentialLoose): AuthKindS
       }
       throw new Error(
         `pickAuthKind: google credential missing both 'api_key' and 'service_key'`,
+      );
+    }
+
+    case 'google_s2s': {
+      const svc = authKinds.find((k) => k.kind === 'vertexServiceAccount');
+      const apiKey = authKinds.find((k) => k.kind === 'googleApiKey');
+      if (raw.service_key && svc) return svc;
+      if (raw.api_key && apiKey) return apiKey;
+      throw new Error(
+        `pickAuthKind: google_s2s credential missing both 'api_key' and 'service_key'`,
       );
     }
 
