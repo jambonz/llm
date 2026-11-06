@@ -147,3 +147,56 @@ describe('vendor categories', () => {
     expect(() => normalizeAuth('dialogflow_ces', { service_key: '{}' })).toThrow(/unknown vendor/);
   });
 });
+
+describe('speech-to-speech vendors, batch two', () => {
+  const fieldsOf = (vendor: string, kind = 0) =>
+    getVendorManifest(vendor).authKinds[kind]!.fields.map((f) => [f.name, f.type, f.required]);
+
+  it('lists each one as a credential-only s2s vendor with no models', () => {
+    for (const id of [
+      'google_s2s',
+      'xai_s2s',
+      'qwen_s2s',
+      'assemblyai_s2s',
+      'voicelive_s2s',
+      'azure_openai_s2s',
+      'nova_s2s',
+    ]) {
+      const m = getVendorManifest(id);
+      expect(m.credentialOnly, id).toBe(true);
+      expect(m.category, id).toBe('s2s');
+      expect(m.knownModels, id).toEqual([]);
+      expect(listVendors(), id).not.toContain(id);
+    }
+  });
+
+  it('declares the fields feature-server reads', () => {
+    expect(fieldsOf('xai_s2s')).toEqual([['apiKey', 'password', true]]);
+    expect(fieldsOf('assemblyai_s2s')).toEqual([['apiKey', 'password', true]]);
+    for (const id of ['qwen_s2s', 'voicelive_s2s', 'azure_openai_s2s']) {
+      expect(fieldsOf(id), id).toEqual([
+        ['apiKey', 'password', true],
+        ['host', 'text', true],
+      ]);
+    }
+    expect(fieldsOf('nova_s2s')).toEqual([
+      ['accessKeyId', 'text', true],
+      ['secretAccessKey', 'password', true],
+      ['region', 'text', true],
+    ]);
+  });
+
+  it('google_s2s takes an API key or a Vertex service account', () => {
+    expect(fieldsOf('google_s2s', 0)).toEqual([['apiKey', 'password', true]]);
+    expect(fieldsOf('google_s2s', 1)).toEqual([
+      ['credentials', 'json-file', true],
+      ['projectId', 'text', false],
+      ['location', 'text', true],
+    ]);
+    expect(pickAuthKind('google_s2s', { api_key: 'k' }).kind).toBe('googleApiKey');
+    expect(pickAuthKind('google_s2s', { service_key: '{}', location: 'us-central1' }).kind).toBe(
+      'vertexServiceAccount',
+    );
+    expect(() => pickAuthKind('google_s2s', {})).toThrow(/missing both/);
+  });
+});
