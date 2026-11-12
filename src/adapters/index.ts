@@ -43,6 +43,7 @@ import { assemblyaiS2sManifest } from '../vendors/assemblyai-s2s.js';
 import { voiceliveS2sManifest } from '../vendors/voicelive-s2s.js';
 import { azureOpenaiS2sManifest } from '../vendors/azure-openai-s2s.js';
 import { novaS2sManifest } from '../vendors/nova-s2s.js';
+import { phonicS2sManifest } from '../vendors/phonic-s2s.js';
 
 registerAdapter(openAIFactory);
 registerAdapter(deepseekFactory);
@@ -77,4 +78,5 @@ registerCredentialVendor(assemblyaiS2sManifest);
 registerCredentialVendor(voiceliveS2sManifest);
 registerCredentialVendor(azureOpenaiS2sManifest);
 registerCredentialVendor(novaS2sManifest);
+registerCredentialVendor(phonicS2sManifest);
 registerCredentialVendor(dialogflowCesManifest);
