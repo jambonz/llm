@@ -161,6 +161,7 @@ describe('speech-to-speech vendors, batch two', () => {
       'voicelive_s2s',
       'azure_openai_s2s',
       'nova_s2s',
+      'phonic_s2s',
     ]) {
       const m = getVendorManifest(id);
       expect(m.credentialOnly, id).toBe(true);
@@ -173,6 +174,8 @@ describe('speech-to-speech vendors, batch two', () => {
   it('declares the fields feature-server reads', () => {
     expect(fieldsOf('xai_s2s')).toEqual([['apiKey', 'password', true]]);
     expect(fieldsOf('assemblyai_s2s')).toEqual([['apiKey', 'password', true]]);
+    expect(fieldsOf('phonic_s2s')).toEqual([['apiKey', 'password', true]]);
+    expect(pickAuthKind('phonic_s2s', { api_key: 'ph_k' }).kind).toBe('apiKey');
     for (const id of ['qwen_s2s', 'voicelive_s2s', 'azure_openai_s2s']) {
       expect(fieldsOf(id), id).toEqual([
         ['apiKey', 'password', true],
