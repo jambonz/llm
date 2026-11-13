@@ -101,13 +101,16 @@ describe('vendor categories', () => {
     expect(listVendors()).not.toContain('rime_s2s');
   });
 
-  it('gptlive_s2s is a credential-only speech-to-speech vendor with one required secret key', () => {
+  it('gptlive_s2s is a credential-only speech-to-speech vendor: a secret key and an optional base URL', () => {
     const m = getVendorManifest('gptlive_s2s');
     expect(m.credentialOnly).toBe(true);
     expect(m.category).toBe('s2s');
     expect(m.authKinds[0]!.fields.map((f) => [f.name, f.type, f.required])).toEqual([
       ['apiKey', 'password', true],
+      ['baseURL', 'url', false],
     ]);
+    // a default would be prefilled and stored, so an empty field must mean OpenAI
+    expect(m.authKinds[0]!.fields[1]!.default).toBeUndefined();
     expect(() => getAdapterFactory('gptlive_s2s')).toThrow(/credential-only/);
     expect(listVendors()).not.toContain('gptlive_s2s');
   });
