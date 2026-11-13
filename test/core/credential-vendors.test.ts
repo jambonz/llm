@@ -112,6 +112,18 @@ describe('vendor categories', () => {
     expect(listVendors()).not.toContain('gptlive_s2s');
   });
 
+  it('kugelaudio_s2s is a credential-only speech-to-speech vendor: a secret key and a region', () => {
+    const m = getVendorManifest('kugelaudio_s2s');
+    expect(m.credentialOnly).toBe(true);
+    expect(m.category).toBe('s2s');
+    const [key, region] = m.authKinds[0]!.fields;
+    expect([key!.name, key!.type, key!.required]).toEqual(['apiKey', 'password', true]);
+    expect([region!.name, region!.type, region!.default]).toEqual(['region', 'select', 'global']);
+    expect(region!.options!.map((o) => o.value)).toEqual(['global', 'eu', 'us']);
+    expect(() => getAdapterFactory('kugelaudio_s2s')).toThrow(/credential-only/);
+    expect(listVendors()).not.toContain('kugelaudio_s2s');
+  });
+
   it('ultravox_s2s is a credential-only speech-to-speech vendor with one required secret key', () => {
     const m = getVendorManifest('ultravox_s2s');
     expect(m.credentialOnly).toBe(true);
