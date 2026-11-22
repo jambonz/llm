@@ -561,7 +561,7 @@ describe('OpenAI adapter — wire format', () => {
     expect(body.max_tokens).toBeUndefined();
   });
 
-  it.each(['gpt-6.2-sol', 'gpt-6.1-sol', 'gpt-7', 'gpt-10-mini'])(
+  it.each(['gpt-6.2-sol', 'gpt-6.1-sol', 'gpt-6-luna', 'gpt-7'])(
     'switches to max_completion_tokens for newer generation %s',
     async (model) => {
       mocks.create.mockResolvedValueOnce(
@@ -575,7 +575,7 @@ describe('OpenAI adapter — wire format', () => {
     },
   );
 
-  it.each(['gpt-4.1', 'gpt-4o-mini', 'gpt-3.5-turbo'])(
+  it.each(['gpt-4.1', 'gpt-4o-mini', 'gpt-3.5-turbo', 'gpt-35-turbo'])(
     'keeps legacy max_tokens for %s',
     async (model) => {
       mocks.create.mockResolvedValueOnce(

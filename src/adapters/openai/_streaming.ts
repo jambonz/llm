@@ -484,7 +484,7 @@ function capabilitiesFor(
  * Exposed so adapter authors (and tests) can rely on the same heuristic.
  */
 export function needsMaxCompletionTokens(modelId: string): boolean {
-  return /^(o\d|gpt-([5-9]|\d{2,}))/i.test(modelId);
+  return /^(o\d|gpt-[5-9])/i.test(modelId);
 }
 
 export function defaultCapabilitiesForUnknown(modelId: string): ModelCapabilities {
