@@ -476,7 +476,7 @@ function capabilitiesFor(
 
 /**
  * Does this model id require `max_completion_tokens` instead of legacy
- * `max_tokens`? OpenAI's reasoning family (o1, o3, o4) and gpt-5 dropped
+ * `max_tokens`? OpenAI's reasoning family (o1, o3, o4) and gpt-5 onward dropped
  * `max_tokens` and return a 400 `Unsupported parameter` when it's sent.
  * Older chat models (gpt-4, gpt-4o, gpt-3.5-turbo) still accept `max_tokens`,
  * so we only switch when the model id matches the newer prefixes.
@@ -484,7 +484,7 @@ function capabilitiesFor(
  * Exposed so adapter authors (and tests) can rely on the same heuristic.
  */
 export function needsMaxCompletionTokens(modelId: string): boolean {
-  return /^(o\d|gpt-5)/i.test(modelId);
+  return /^(o\d|gpt-([5-9]|\d{2,}))/i.test(modelId);
 }
 
 export function defaultCapabilitiesForUnknown(modelId: string): ModelCapabilities {
