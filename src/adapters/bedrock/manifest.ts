@@ -148,6 +148,7 @@ const BEDROCK_KNOWN_MODELS: ModelInfo[] = [
       systemPrompt: true,
       maxContextTokens: 128_000,
     },
+    deprecated: true,
   },
   {
     id: 'mistral.mistral-large-2407-v1:0',
