@@ -125,8 +125,9 @@ export type LlmEvent =
        * unchanged. Anthropic records the turn's content blocks here
        * (`thinking`, `redacted_thinking`, text and `tool_use`, in order) and
        * replays them, so the model keeps its reasoning after the tool result
-       * instead of working the turn out again. Absent unless the adapter
-       * set it.
+       * instead of working the turn out again. The Gemini adapters record the
+       * `thoughtSignature` of the call's `functionCall` part, which Gemini 3
+       * requires back on that part. Absent unless the adapter set it.
        */
       vendorRaw?: unknown;
     }

@@ -36,6 +36,10 @@ Gemini's `functionCall` parts carry a `name` but **no id**. Multi-tool conversat
 
 Similar to Anthropic: the assistant turn with a `functionCall` part and the user turn with a `functionResponse` part both store their native wire shapes in `vendorRaw`. The next `stream()` reads them back unchanged.
 
+### Thought signatures
+
+Thinking models return an opaque `thoughtSignature` next to `functionCall` (with parallel calls, on the first part only). Gemini 3 requires it back on that same part in the history, or rejects the request with a 400. `stream()` records it on the `toolCall` event's `vendorRaw` and `appendAssistantToolCall()` writes it back onto the call's `functionCall` part, so callers must pass the events through unchanged. Signatures on text parts are optional for the API and are not kept. See [thought signatures](https://ai.google.dev/gemini-api/docs/thought-signatures).
+
 ### Abort
 
 The SDK's streaming iterator honors `AbortSignal` — pass `req.signal` through. No polling needed.

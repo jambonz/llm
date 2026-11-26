@@ -73,7 +73,12 @@ export async function* streamFromGemini(
   }
 
   const toolCallCounter = new Map<string, number>();
-  const completedToolCalls: Array<{ id: string; name: string; arguments: unknown }> = [];
+  const completedToolCalls: Array<{
+    id: string;
+    name: string;
+    arguments: unknown;
+    thoughtSignature?: string;
+  }> = [];
   let stopReason: string | undefined;
   let inputTokens: number | undefined;
   let outputTokens: number | undefined;
@@ -124,6 +129,10 @@ export async function* streamFromGemini(
             id,
             name,
             arguments: part.functionCall.args ?? {},
+            // Gemini 3 requires the signature back on this same part in the
+            // next request, or rejects it with a 400. With parallel calls only
+            // the first functionCall part carries one.
+            ...(part.thoughtSignature ? { thoughtSignature: part.thoughtSignature } : {}),
           });
         }
       }
@@ -146,11 +155,15 @@ export async function* streamFromGemini(
   }
 
   for (const tc of completedToolCalls) {
+    const raw: GeminiToolCallRaw | undefined = tc.thoughtSignature
+      ? { thoughtSignature: tc.thoughtSignature }
+      : undefined;
     yield {
       type: 'toolCall',
       id: tc.id,
       name: tc.name,
       arguments: tc.arguments,
+      ...(raw ? { vendorRaw: raw } : {}),
     };
   }
 
@@ -190,12 +203,16 @@ export function appendGeminiAssistantToolCall(
     role: 'model',
     parts: [
       ...(text ? [{ text }] : []),
-      ...toolCalls.map((tc) => ({
-        functionCall: {
-          name: parseToolName(tc.id),
-          args: tc.arguments ?? {},
-        },
-      })),
+      ...toolCalls.map((tc) => {
+        const thoughtSignature = thoughtSignatureOf(tc);
+        return {
+          functionCall: {
+            name: parseToolName(tc.id),
+            args: tc.arguments ?? {},
+          },
+          ...(thoughtSignature ? { thoughtSignature } : {}),
+        };
+      }),
     ],
   };
   return [
@@ -318,6 +335,21 @@ function mapFinishReason(r: string | undefined, hadToolCalls: boolean): FinishRe
     default:
       return 'stop';
   }
+}
+
+/** Shape of `vendorRaw` on the toolCall events `streamFromGemini` emits. */
+interface GeminiToolCallRaw {
+  /** The opaque `thoughtSignature` Gemini sent with the call's functionCall part. */
+  thoughtSignature: string;
+}
+
+/**
+ * The thought signature `streamFromGemini` recorded on a toolCall event.
+ * Events built by the caller (no `vendorRaw`) have none.
+ */
+function thoughtSignatureOf(tc: Extract<LlmEvent, { type: 'toolCall' }>): string | undefined {
+  const signature = (tc.vendorRaw as Partial<GeminiToolCallRaw> | undefined)?.thoughtSignature;
+  return typeof signature === 'string' && signature ? signature : undefined;
 }
 
 function parseToolName(id: string): string {
