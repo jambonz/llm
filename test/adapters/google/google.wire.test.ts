@@ -391,6 +391,116 @@ describe('Google Gemini adapter — wire format', () => {
     expect(toolMsg).toBeDefined();
   });
 
+  describe('thought signatures', () => {
+    const tools = [{ name: 'get_weather', description: 'x', parameters: { type: 'object' } }];
+    const userTurn = { role: 'user' as const, content: 'Weather in Paris and London?' };
+    const stop = { candidates: [{ content: { parts: [] }, finishReason: 'STOP' }] };
+
+    function modelChunk(parts: Array<Record<string, unknown>>): Record<string, unknown> {
+      return { candidates: [{ content: { role: 'model', parts } }] };
+    }
+
+    async function streamToolCalls(
+      adapter: LlmAdapter,
+      chunks: Array<Record<string, unknown>>,
+    ): Promise<Array<Extract<LlmEvent, { type: 'toolCall' }>>> {
+      mocks.generateContentStream.mockResolvedValueOnce(mockStream(chunks));
+      const events = await drain(adapter, {
+        model: 'gemini-3.5-flash-lite',
+        messages: [userTurn],
+        tools,
+      });
+      return events.filter(
+        (e): e is Extract<LlmEvent, { type: 'toolCall' }> => e.type === 'toolCall',
+      );
+    }
+
+    it('sends a streamed functionCall thoughtSignature back on that part in the next request', async () => {
+      const adapter = await buildAdapter();
+      const toolCalls = await streamToolCalls(adapter, [
+        modelChunk([{ text: 'Let me check.' }]),
+        modelChunk([
+          {
+            functionCall: { name: 'get_weather', args: { city: 'Paris' } },
+            thoughtSignature: 'sig-A',
+          },
+        ]),
+        stop,
+      ]);
+      expect(toolCalls).toHaveLength(1);
+
+      let history = adapter.appendAssistantToolCall([userTurn], toolCalls, 'Let me check.');
+      history = adapter.appendToolResult(history, toolCalls[0]!.id, { temp: '15C' });
+      mocks.generateContentStream.mockResolvedValueOnce(mockStream([stop]));
+      await drain(adapter, { model: 'gemini-3.5-flash-lite', messages: history, tools });
+
+      const [arg] = mocks.generateContentStream.mock.calls[1]!;
+      expect(arg.contents[1]).toStrictEqual({
+        role: 'model',
+        parts: [
+          { text: 'Let me check.' },
+          {
+            functionCall: { name: 'get_weather', args: { city: 'Paris' } },
+            thoughtSignature: 'sig-A',
+          },
+        ],
+      });
+    });
+
+    it('keeps the thoughtSignature on the first of parallel functionCall parts only', async () => {
+      const adapter = await buildAdapter();
+      const toolCalls = await streamToolCalls(adapter, [
+        modelChunk([
+          {
+            functionCall: { name: 'get_weather', args: { city: 'Paris' } },
+            thoughtSignature: 'sig-A',
+          },
+          { functionCall: { name: 'get_weather', args: { city: 'London' } } },
+        ]),
+        stop,
+      ]);
+      expect(toolCalls.map((tc) => tc.id)).toEqual(['get_weather', 'get_weather#1']);
+
+      let history = adapter.appendAssistantToolCall([userTurn], toolCalls);
+      history = adapter.appendToolResult(history, toolCalls[0]!.id, { temp: '15C' });
+      history = adapter.appendToolResult(history, toolCalls[1]!.id, { temp: '12C' });
+      mocks.generateContentStream.mockResolvedValueOnce(mockStream([stop]));
+      await drain(adapter, { model: 'gemini-3.5-flash-lite', messages: history, tools });
+
+      const [arg] = mocks.generateContentStream.mock.calls[1]!;
+      expect(arg.contents[1]).toStrictEqual({
+        role: 'model',
+        parts: [
+          {
+            functionCall: { name: 'get_weather', args: { city: 'Paris' } },
+            thoughtSignature: 'sig-A',
+          },
+          { functionCall: { name: 'get_weather', args: { city: 'London' } } },
+        ],
+      });
+    });
+
+    it('leaves history without a thoughtSignature unchanged', async () => {
+      const adapter = await buildAdapter();
+      const toolCalls = await streamToolCalls(adapter, [
+        modelChunk([{ functionCall: { name: 'get_weather', args: { city: 'Paris' } } }]),
+        stop,
+      ]);
+      expect(toolCalls[0]).not.toHaveProperty('vendorRaw');
+
+      let history = adapter.appendAssistantToolCall([userTurn], toolCalls);
+      history = adapter.appendToolResult(history, toolCalls[0]!.id, { temp: '15C' });
+      mocks.generateContentStream.mockResolvedValueOnce(mockStream([stop]));
+      await drain(adapter, { model: 'gemini-2.5-flash', messages: history, tools });
+
+      const [arg] = mocks.generateContentStream.mock.calls[1]!;
+      expect(arg.contents[1]).toStrictEqual({
+        role: 'model',
+        parts: [{ functionCall: { name: 'get_weather', args: { city: 'Paris' } } }],
+      });
+    });
+  });
+
   it('converts AbortError into end(aborted)', async () => {
     const err = new Error('aborted');
     (err as Error & { name: string }).name = 'AbortError';
